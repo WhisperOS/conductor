@@ -28,9 +28,9 @@ typedef struct {
 	char *country;
 	char *locality;
 	char *organization;
-} conf;
+} cndtr_t;
 
-conf *config;
+cndtr_t *cndtr;
 
 static void seed_entropy(void);
 static void cleanup_crypto(void);
@@ -100,7 +100,7 @@ int main(int argc, char *argv[])
 #undef _GNU_SOURCE
 	initialize_crypto();
 
-	config  = malloc(sizeof(conf));
+	cndtr  = malloc(sizeof(cndtr_t));
 	char *home = getenv("HOME");
 	char *etc  = "/etc/conductor.conf";
 	strcat(home, "/.cndtrc");
@@ -109,13 +109,14 @@ int main(int argc, char *argv[])
 	EVP_PKEY *in_key = NULL;
 	X509     *in_crt = NULL;
 	char *REQ_DN_CA;
-	REQ_DN_CA = malloc(strlen(config->organization) + 10);
-	REQ_DN_CA = config->organization;
+	REQ_DN_CA = malloc(strlen(cndtr->organization) + 24);
+	strcpy(REQ_DN_CA, cndtr->organization);
 	strcat(REQ_DN_CA, " Root CA");
 	char *REQ_DN_IN;
-	REQ_DN_IN = malloc(strlen(config->organization) + 18);
-	REQ_DN_IN = config->organization;
+	REQ_DN_IN = malloc(strlen(cndtr->organization) + 24);
+	strcpy(REQ_DN_IN, cndtr->organization);
 	strcat(REQ_DN_IN, " Intermediate CA");
+
 	if (access("intermediate_cert.pem", F_OK) != -1) {
 		if (load_pair("intermediate_key.pem", &in_key, "intermediate_cert.pem", &in_crt)) {
 			fprintf(stderr, "Intermediate CA detected but unable to load pair.\n");
@@ -148,6 +149,7 @@ int main(int argc, char *argv[])
 	EVP_PKEY *key = NULL;
 	X509     *crt = NULL;
 	char *CN;
+
 	if (argv[optind] != NULL && argv[optind + 1] != NULL) {
 		CN = strdup(argv[optind + 1]);
 		if (strncmp("both", argv[optind], 4) == 0) {
@@ -190,42 +192,27 @@ int main(int argc, char *argv[])
 
 static int parse_config(char *conf_file) /* {{{ */
 {
-	FILE *fp = fopen(conf_file, "r");
 	int ret = 0;
+	if (access(conf_file, F_OK) == -1)
+		return 0;
+	FILE *fp = fopen(conf_file, "r");
 
-	if (fp == NULL) {
-		ret = 1;
-		goto EXIT;
-	}
+	if (fp == NULL)
+		return 1;
+	fseek(fp, 0, SEEK_END);
+	long fsize = ftell(fp);
+	fseek(fp, 0, SEEK_SET);
 
-	if (access(conf_file, F_OK) == -1) {
-		ret = 0;
-		goto EXIT;
-	}
-	int nread = 0;
-	int total = 0;
-	char buf[1024];
-	memset(buf, 0, sizeof(buf));
-	char *file = malloc(1024);
-	char *old = malloc(1024);
-	while ((nread = fread(buf, 1, sizeof(buf), fp))) {
-		total += nread;
-		file = malloc(total);
-		memset(file, 0, total);
-		file = old;
-		free(old);
-		strcat(file, buf);
-		old = file;
-	}
+	char *file = malloc(fsize + 1);
+	fread(file, fsize, 1, fp);
+	fclose(fp);
+	file[fsize] = 0;
 	char *tok;
 	char *delims = "\n\r";
-	tok = strtok(file, delims);
 	int i = 0;
 	char *key, *val;
-	conf *config;
-	config = malloc(sizeof(conf));
+	tok = strtok(file, delims);
 	while (tok != NULL) {
-
 		val = strchr(tok, '=');
 		val++;
 		i = strcspn(tok, val);
@@ -242,20 +229,19 @@ static int parse_config(char *conf_file) /* {{{ */
 		while (val[i] == ' ' || val[i] == '\t') { val[i] = '\0'; i--; }
 
 		if (strcmp(key, "OU") == 0) {
-			config->unit = strdup(val);
+			cndtr->unit = strdup(val);
 		} else if (strcmp(key, "ST") == 0) {
-			config->state = strdup(val);
+			cndtr->state = strdup(val);
 		} else if (strcmp(key, "C") == 0) {
-			config->country = strdup(val);
+			cndtr->country = strdup(val);
 		} else if (strcmp(key, "L") == 0) {
-			config->locality = strdup(val);
+			cndtr->locality = strdup(val);
 		} else if (strcmp(key, "O") == 0) {
-			config->organization = strdup(val);
+			cndtr->organization = strdup(val);
 		}
+		memset(tok, 0, strlen(tok)+1);
 		tok = strtok(NULL, delims);
 	}
-EXIT:
-	fclose(fp);
 
 	return ret;
 }
@@ -308,6 +294,8 @@ int save_pair(const char *key_path, EVP_PKEY **key, const char *crt_path, X509 *
 	BIO_free_all(bio);
 	bio = BIO_new_file(key_path, "w");
 	if (!PEM_write_bio_PrivateKey(bio, *key, NULL, NULL, 0, NULL, NULL)) goto err;
+	chmod(crt_path, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP);
+	chmod(key_path, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP);
 	BIO_free_all(bio);
 	return 0;
 err:
@@ -387,8 +375,8 @@ int generate_pair(EVP_PKEY *ca_key, X509 *ca_crt, EVP_PKEY **key, X509 **crt, in
 
 	X509V3_CTX      v3ctx;
 	char *NS_COMMENT;
-	NS_COMMENT = malloc(strlen(config->organization) + 13);
-	NS_COMMENT = config->organization;
+	NS_COMMENT = malloc(strlen(cndtr->organization) + 20);
+	strcpy(NS_COMMENT, cndtr->organization);
 	strcat(NS_COMMENT, " Certificate");
 
 	if (CERT_TYPE & TYPE_ca)
@@ -524,11 +512,11 @@ int generate_key_csr(EVP_PKEY **key, X509_REQ **req, char *CN) /* {{{ */
 
 	#define addName(field, value) X509_NAME_add_entry_by_txt(name, field,  MBSTRING_ASC, (unsigned char *)value, -1, -1, 0)
 	X509_NAME *name = X509_REQ_get_subject_name(*req);
-	addName("C",  config->country);
-	addName("ST", config->state);
-	addName("L",  config->locality);
-	addName("O",  config->organization);
-	addName("OU", config->unit);
+	addName("C",  cndtr->country);
+	addName("ST", cndtr->state);
+	addName("L",  cndtr->locality);
+	addName("O",  cndtr->organization);
+	addName("OU", cndtr->unit);
 	addName("CN", CN);
 	#undef addName
 
