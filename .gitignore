@@ -1,0 +1,8 @@
+*.swp
+*.o
+*.pem
+*.key
+*.crt
+*.csr
+conductor
+man/conductor.1

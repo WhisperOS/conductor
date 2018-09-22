@@ -1,0 +1,63 @@
+
+=head1 NAME
+
+conductor - Cert Generator
+
+=head1 SYNOPSIS
+
+B<conductor> server|client|both fqdn <-d alt dns> <-i alt ip>
+
+=head1 DESCRIPTION
+
+B<Conductor> is a X509 cert generator for building complete Certificate
+Authority chains and certs. It can be used to Generate robust SAN (Subject
+Alternative Name) Certs using simple command line switches.
+
+B<Conductor> Reads a config file to set basic information about the Certificate
+Authority, L (Locality, commonly used as city), C (Country), ST, (state or
+province), OU (Organizational Unit/Department), O (Organization, usually Company
+Name). These files are located at B</etc/conductor.conf>, and B<HOME/.cndtrc>,
+the home rc file will override any system wide variables. Syntax is INI.
+
+=head1 OPTIONS
+
+=over
+
+=item B<TYPE>
+
+Required, options are; both, user, or server for the type of cert to generate
+
+=item B<NAME>
+
+Required, commonly is an email or server fqdn but could theoretically be anything.
+
+=item B<-h>, B<--help>
+
+Show the help.
+
+=item B<-i>, B<--ip> IP ADDRESS
+
+Add a SAN IP.
+
+=item B<-d>, B<--domain> DOMAIN NAME
+
+Add a SAN domain name.
+
+=back
+
+=head1 Conf File Example
+
+    C  = US
+    ST = NY
+    L  = Buffalo
+    OU = IT
+    O  = Defiance Technologies Inc.
+
+=head1 SEE ALSO
+
+
+=head1 AUTHOR
+
+Dan Molik <dan @ danmolik dot com>
+
+=cut
