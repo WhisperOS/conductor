@@ -38,8 +38,9 @@ static void initialize_crypto(void);
 static int generate_key_csr(EVP_PKEY **key, X509_REQ **req, char *CN);
 static int generate_set_random_serial(X509 *crt);
 static int generate_pair(EVP_PKEY *ca_key, X509 *ca_crt, EVP_PKEY **key, X509 **crt, int CERT_TYPE, char *CN, int num_ips, char **ips, int num_domains, char **domains);
-static int load_pair(const char *key_path, EVP_PKEY **key, const char *crt_path, X509 **crt);
-static int save_pair(const char *key_path, EVP_PKEY **key, const char *crt_path, X509 **crt);
+static int load_pair(char *key_path, EVP_PKEY **key, char *crt_path, X509 **crt);
+static int save_key(const char *key_path, EVP_PKEY **key);
+static int save_cert(const char *crt_path, X509 **crt, X509 **in, X509 **ca);
 static int add_ext(X509V3_CTX *ctx, X509 *crt, int nid, char *value);
 static char * strdup(const char *src);
 static int parse_config(char *conf_file);
@@ -116,15 +117,19 @@ int main(int argc, char *argv[])
 	REQ_DN_IN = malloc(strlen(cndtr->organization) + 24);
 	strcpy(REQ_DN_IN, cndtr->organization);
 	strcat(REQ_DN_IN, " Intermediate CA");
+	X509     *ca_crt = NULL;
 
 	if (access("intermediate_cert.pem", F_OK) != -1) {
 		if (load_pair("intermediate_key.pem", &in_key, "intermediate_cert.pem", &in_crt)) {
 			fprintf(stderr, "Intermediate CA detected but unable to load pair.\n");
 			return 1;
 		}
+		if (load_pair(NULL, NULL, "ca_cert.pem", &ca_crt)) {
+			fprintf(stderr, "CA detected but unable to load pair.\n");
+			return 1;
+		}
 	} else {
 		EVP_PKEY *ca_key = NULL;
-		X509     *ca_crt = NULL;
 		if (access("ca_cert.pem", F_OK) != -1) {
 			if (load_pair("ca_key.pem", &ca_key, "ca_cert.pem", &ca_crt)) {
 				fprintf(stderr, "failed to load ca pair\n");
@@ -135,15 +140,17 @@ int main(int argc, char *argv[])
 				fprintf(stderr, "Failed to generate CA keys\n");
 				return 1;
 			}
-			save_pair("ca_key.pem", &ca_key, "ca_cert.pem", &ca_crt);
+			save_key("ca_key.pem", &ca_key);
+			save_cert("ca_cert.pem", &ca_crt, NULL, NULL);
 		}
 		if (generate_pair(ca_key, ca_crt, &in_key, &in_crt, TYPE_intermediate, REQ_DN_IN, 0, NULL, 0, NULL)) {
 			fprintf(stderr, "Failed to generate key pair!\n");
 			return 1;
 		}
-		save_pair("intermediate_key.pem", &in_key, "intermediate_cert.pem", &in_crt);
+		save_key("intermediate_key.pem", &in_key);
+		save_cert("ca_chain.pem", &in_crt, &ca_crt, NULL);
+		save_cert("intermediate_cert.pem", &in_crt, NULL, NULL);
 		EVP_PKEY_free(ca_key);
-		X509_free(ca_crt);
 	}
 
 	EVP_PKEY *key = NULL;
@@ -174,13 +181,20 @@ int main(int argc, char *argv[])
 	}
 	char key_path[80];
 	char cert_path[80];
+	char fullchain[80];
 	strcpy(key_path,  CN);
 	strcpy(cert_path, CN);
 	strcat(key_path, ".key.pem");
 	strcat(cert_path, ".cert.pem");
-	save_pair(key_path, &key, cert_path, &crt);
+	strcpy(fullchain, CN);
+	strcat(fullchain, ".fullchain.pem");
+
+	save_cert(cert_path, &crt, NULL, NULL);
+	save_cert(fullchain, &crt, &in_crt, &ca_crt);
+	save_key(key_path, &key);
 
 	X509_free(in_crt);
+	X509_free(ca_crt);
 	EVP_PKEY_free(in_key);
 	X509_free(crt);
 	EVP_PKEY_free(key);
@@ -287,40 +301,50 @@ void cleanup_crypto() /* {{{ */
 }
 /* }}} */
 
-int save_pair(const char *key_path, EVP_PKEY **key, const char *crt_path, X509 **crt) /* {{{ */
+int save_key(const char *key_path, EVP_PKEY **key) /* {{{ */
 {
-	BIO *bio = BIO_new_file(crt_path, "w");
-	if (!PEM_write_bio_X509(bio, *crt)) goto err;
-	BIO_free_all(bio);
-	bio = BIO_new_file(key_path, "w");
+	BIO *bio = BIO_new_file(key_path, "w");
 	if (!PEM_write_bio_PrivateKey(bio, *key, NULL, NULL, 0, NULL, NULL)) goto err;
-	chmod(crt_path, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP);
-	chmod(key_path, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP);
 	BIO_free_all(bio);
+	chmod(key_path, S_IRUSR|S_IWUSR);
 	return 0;
 err:
 	return 1;
 }
 /* }}} */
 
-int load_pair(const char *key_path, EVP_PKEY **key, const char *crt_path, X509 **crt) /* {{{ */
+int save_cert(const char *crt_path, X509 **crt, X509 **in, X509 **ca) /* {{{ */
+{
+	BIO *bio = BIO_new_file(crt_path, "w");
+	if (crt != NULL) if (!PEM_write_bio_X509(bio, *crt)) goto err;
+	if (in  != NULL) if (!PEM_write_bio_X509(bio, *in )) goto err;
+	if (ca  != NULL) if (!PEM_write_bio_X509(bio, *ca )) goto err;
+	BIO_free_all(bio);
+	chmod(crt_path, S_IRUSR|S_IWUSR);
+	return 0;
+err:
+	return 1;
+}
+/* }}} */
+
+int load_pair(char *key_path, EVP_PKEY **key, char *crt_path, X509 **crt) /* {{{ */
 {
 	BIO *bio = NULL;
-	*crt = NULL;
-	*key = NULL;
+	if (crt_path != NULL) *crt = NULL;
+	if (key_path != NULL) *key = NULL;
 
 	/* Load CA public key. */
 	bio = BIO_new(BIO_s_file());
-	if (!BIO_read_filename(bio, crt_path)) goto err;
-	*crt = PEM_read_bio_X509(bio, NULL, NULL, NULL);
-	if (!*crt) goto err;
+	if (crt_path != NULL) if (!BIO_read_filename(bio, crt_path)) goto err;
+	if (crt_path != NULL) *crt = PEM_read_bio_X509(bio, NULL, NULL, NULL);
+	if (crt_path != NULL) if (!*crt) goto err;
 	BIO_free_all(bio);
 
 	/* Load CA private key. */
 	bio = BIO_new(BIO_s_file());
-	if (!BIO_read_filename(bio, key_path)) goto err;
-	*key = PEM_read_bio_PrivateKey(bio, NULL, NULL, NULL);
-	if (!key) goto err;
+	if (key_path != NULL) if (!BIO_read_filename(bio, key_path)) goto err;
+	if (key_path != NULL) *key = PEM_read_bio_PrivateKey(bio, NULL, NULL, NULL);
+	if (key_path != NULL) if (!key) goto err;
 	BIO_free_all(bio);
 	return 0;
 err:
