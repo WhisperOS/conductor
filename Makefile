@@ -1,7 +1,7 @@
 CXXFLAGS =-std=c99 -pipe -g -Wall -Wextra -pedantic
 CFLAGS  ?=
 LDFLAGS  =
-LIBS     = -lcrypto
+LIBS     = -lcrypto -lkrb5 -lcom_err -lldap -lgssapi_krb5 -lsasl2
 PREFIX  ?= /usr/local
 DESTDIR ?=
 VERSION = $(shell git describe --tags | head -n1)

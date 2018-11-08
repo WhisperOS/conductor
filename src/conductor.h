@@ -26,10 +26,9 @@ typedef struct {
 		char *principal;
 	} krb;
 	struct {
-		char *st
+		char *st;
 		char *ou;
 		char *l;
-		char *c;
 		char *o;
 		char *c;
 	} org;

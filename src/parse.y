@@ -6,7 +6,7 @@
 #include <errno.h>
 #include <arpa/inet.h>
 
-#include "server.h"
+#include "conductor.h"
 #include "config_file.h"
 
 config_t *p_config;
@@ -109,10 +109,10 @@ ldap_section:
 	;
 
 ldap_statement:
-	  URI    LDAPDN { p_config->ldap.uri   = $2 }
-	| DN     LDAPDN { p_config->ldap.dn    = $2 }
-	| BIND   LDAPDN { p_config->ldap.bind  = $2 }
-	| PW     PASSWD { p_config->ldap.pw    = $2 }
+	  URI    LDAPDN { p_config->ldap.uri   = $2; }
+	| DN     LDAPDN { p_config->ldap.dn    = $2; }
+	| BIND   LDAPDN { p_config->ldap.bind  = $2; }
+	| PW     PASSWD { p_config->ldap.pw    = $2; }
 
 org_section:
 	| org_section org_statement
