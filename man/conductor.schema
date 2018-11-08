@@ -1,0 +1,67 @@
+#
+# OpenLDAP schema file for Conductor
+#  Requires Core Schema ( Should be included by default )
+
+attributetype ( 1.3.5.1.4.1.52904.3.1.1
+	NAME 'conductorCaCert'
+	DESC 'Conductor CA Cert'
+	SYNTAX 1.3.6.1.4.1.1466.115.121.1.5 )
+
+attributetype ( 1.3.5.1.4.1.52904.3.1.2
+	NAME 'conductorCaKey'
+	DESC 'Conductor CA Key'
+	SYNTAX 1.3.6.1.4.1.1466.115.121.1.5 )
+
+attributetype ( 1.3.5.1.4.1.52904.3.1.3
+	NAME 'conductorIntermediateCert'
+	DESC 'Conductor Intermediate Cert'
+	SYNTAX 1.3.6.1.4.1.1466.115.121.1.5 )
+
+attributetype ( 1.3.5.1.4.1.52904.3.1.4
+	NAME 'conductorIntermediateKey'
+	DESC 'Conductor Intermediate Key'
+	SYNTAX 1.3.6.1.4.1.1466.115.121.1.5 )
+
+attributetype ( 1.3.5.1.4.1.52904.3.1.5
+	NAME 'conductorCert'
+	DESC 'A Conductor Cert'
+	SYNTAX 1.3.6.1.4.1.1466.115.121.1.5 )
+
+attributetype ( 1.3.5.1.4.1.52904.3.1.6
+	NAME 'conductorKey'
+	DESC 'A Conductor Key'
+	SYNTAX 1.3.6.1.4.1.1466.115.121.1.5 )
+
+attributetype ( 1.3.5.1.4.1.52904.3.1.7
+	NAME 'conductorNotBefore'
+	DESC 'Start of time interval for which the cert is valid'
+	EQUALITY generalizedTimeMatch
+	ORDERING generalizedTimeOrderingMatch
+	SYNTAX 1.3.6.1.4.1.1466.115.121.1.24 )
+
+attributetype ( 1.3.5.1.4.1.52904.3.1.8
+	NAME 'conductorNotAfter'
+	DESC 'End of time interval for which the cert is valid'
+	EQUALITY generalizedTimeMatch
+	ORDERING generalizedTimeOrderingMatch
+	SYNTAX 1.3.6.1.4.1.1466.115.121.1.24 )
+
+attributetype ( 1.3.5.1.4.1.52904.3.1.9
+	NAME 'conductorSubTrees'
+	EQUALITY distinguishedNameMatch
+	SYNTAX 1.3.6.1.4.1.1466.115.121.1.12 )
+
+objectclass ( 1.3.5.1.4.1.52904.3.2.1 NAME 'conductorContainer'
+	DESC 'Top level conductor information'
+	SUP top STRUCTURAL
+	MUST ( st $ l $ c $ o $ cn $ ou
+		conductorCaCert $ conductorCaKey $ conductorIntermediateCert $
+		conductorIntermediateKey )
+	MAY ( description $ conductorNotBefore $ conductorNotAfter $ conductorSubTrees ) )
+
+objectclass ( 1.3.5.1.4.1.52904.3.2.2 NAME 'conductor'
+	DESC 'A basic conductor certificate entry'
+	SUP top STRUCTURAL
+	MUST ( cn $ conductorCert $ conductorKey )
+	MAY ( description $ conductorNotBefore $ conductorNotAfter $
+		st $ l $ c $ o $ ou) )
