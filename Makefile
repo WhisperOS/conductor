@@ -6,11 +6,28 @@ PREFIX  ?= /usr/local
 DESTDIR ?=
 VERSION = $(shell git describe --tags | head -n1)
 
-all: conductor
+OBJS += 
 
-conductor: src/main.o
-	$(CC) -o $@ $(LIBS) $(CFLAGS) $(CXXFLAGS) $(LDFLAGS) $^
+BINS = conductor
 
+conductor_OBJS := $(OBJS) src/parse.o src/scanner.o src/main.o
+
+all: $(BINS)
+
+define BIN_template =
+ $(1): $$($(1)_OBJS) $$($(1)_LIBS:%=-l%)
+ ALL_OBJS   += $$($(1)_OBJS)
+endef
+
+$(foreach bin,$(BINS),$(eval $(call BIN_template,$(bin))))
+
+$(BINS):
+	$(CC) $(CFLAGS) $(LIBS) $(LDFLAGS) -o $@ ${$@_OBJS}
+
+src/scanner.c: src/scanner.l src/parse.c
+	$(LEX) --header-file --yylineno --outfile=$@ $<
+src/parse.c: src/parse.y
+	$(YACC) -d --output-file=src/parse.c $<
 src/%.o: src/%.c
 	$(CC) -c -o $@ $(CFLAGS) $(CXXFLAGS) $<
 
