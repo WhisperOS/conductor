@@ -6,3 +6,6 @@
 *.csr
 conductor
 man/conductor.1
+man/conductor-schema.ldif
+man/schema-convert.conf
+man/ldif/

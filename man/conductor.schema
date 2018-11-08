@@ -51,10 +51,18 @@ attributetype ( 1.3.5.1.4.1.52904.3.1.9
 	EQUALITY distinguishedNameMatch
 	SYNTAX 1.3.6.1.4.1.1466.115.121.1.12 )
 
+attributetype ( 1.3.5.1.4.1.52904.3.1.10 NAME 'conductorIPSan'
+	DESC 'IP Subject Alternative Name'
+	SUP name )
+
+attributetype ( 1.3.5.1.4.1.52904.3.1.11 NAME 'conductorDNSSan'
+	DESC 'DNS Subject Alternative Name'
+	SUP name )
+
 objectclass ( 1.3.5.1.4.1.52904.3.2.1 NAME 'conductorContainer'
 	DESC 'Top level conductor information'
 	SUP top STRUCTURAL
-	MUST ( st $ l $ c $ o $ cn $ ou
+	MUST ( st $ l $ c $ o $ cn $ ou $
 		conductorCaCert $ conductorCaKey $ conductorIntermediateCert $
 		conductorIntermediateKey )
 	MAY ( description $ conductorNotBefore $ conductorNotAfter $ conductorSubTrees ) )
@@ -64,4 +72,4 @@ objectclass ( 1.3.5.1.4.1.52904.3.2.2 NAME 'conductor'
 	SUP top STRUCTURAL
 	MUST ( cn $ conductorCert $ conductorKey )
 	MAY ( description $ conductorNotBefore $ conductorNotAfter $
-		st $ l $ c $ o $ ou) )
+		st $ l $ c $ o $ ou $ conductorIPSan $ conductorDNSSan ) )
