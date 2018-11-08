@@ -5,7 +5,12 @@
 *.crt
 *.csr
 conductor
+
 man/conductor.1
 man/conductor-schema.ldif
 man/schema-convert.conf
 man/ldif/
+
+src/parse.c
+src/parse.h
+src/scanner.c
