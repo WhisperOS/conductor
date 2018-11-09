@@ -1,51 +1,30 @@
 # Conductor
 
-## 
+Conductor is an easy to use utility to generate self-signed Certificate Authority chains.
+Initially Conductor was written as a testing tool to easily generate certificates for testing
+TLS applications written in C, and for fun!
 
-This example code demonstrates how to use the OpenSSL C API to perform
-the actions by a Certificate Authority.
+## How to
 
-### How it works:
+    conductor server server.domain.tld -i 192.168.1.1 -d service.domain.tld
 
-  - We generate a self-signed CA
-  - We generate a Intermediate CA and sign it with the First CA
-  - We generate a server cert and sign it with the intermediate.
+In a empty directory this will generate you a Certificate Authority Cert/Key,
+an Intermediate Certificate Authority Cert/Key, and a server x.509 cert/key and fullchain.
 
-### During each step we:
+Next generate a user cert.
 
-  - Generate a private RSA key.
-  - Generate a certificate request.
-  - Sign this certificate request using the CA certificate or ourselves.
+    conductor user dan
 
-All certs are saved to file, and are named accordingly.
+It's that easy!
 
-## How to use
+## Installing
 
-1. Run `make` which will compile the application.
-2. Run `./conductor` which will generate a certificate an intermediate and a Root CA
-3. Run `./conductor server hostname.domain.tld` will generate a server cert.
-4. Run `./condictor user   name@domain.tld` will generate a user cert.
-5. Run `./conductor server hostname.domain.tld -d sub.domain.tld -i ipaddress` will add SAN items
+Conductor has a few prerequisites; make, flex, and bison. After those are install all you need to run is:
 
-## For reference only
+    make
 
-## How to Manually verify that a certificate is signed by a CA
+And you'll be able to run conductor right from the repo. Otherwise you can run:
 
-If you want to check that the generated certificate is indeed
-signed by the CA. You must first place the certificate output of `./cert` into
-`cert.crt`.
+    sudo make install
 
-```
-$ openssl verify -CAfile ca.pem cert.crt
-cert.crt: OK
-```
-
-If an error occurs, expect some other output such as `self signed certificate` etc.
-
-## How to manually verify the certificate with the CA key
-
-This is what we'll do with C code instead.
-
-```
-$ openssl x509 -req -days 365 -in vnf.csr -CA ca.pem -CAkey ca.key -CAcreateserial -out vnf.crt
-```
+And by default this will install to /usr/local/bin, of course this is configurable with PREFIX and DESTDIR.
