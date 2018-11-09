@@ -14,7 +14,8 @@
 #include <openssl/rand.h>
 #include <openssl/x509v3.h>
 
-#define RSA_KEY_BITS (4096)
+#include "conductor.h"
+#include "config_file.h"
 
 
 int TYPE_ca           = 0x0001;
@@ -22,15 +23,8 @@ int TYPE_intermediate = 0x0010;
 int TYPE_server       = 0x0100;
 int TYPE_client       = 0x1000;
 
-typedef struct {
-	char *unit;
-	char *state;
-	char *country;
-	char *locality;
-	char *organization;
-} cndtr_t;
+config_t *conf;
 
-cndtr_t *cndtr;
 
 static void seed_entropy(void);
 static void cleanup_crypto(void);
@@ -43,7 +37,6 @@ static int save_key(const char *key_path, EVP_PKEY **key);
 static int save_cert(const char *crt_path, X509 **crt, X509 **in, X509 **ca);
 static int add_ext(X509V3_CTX *ctx, X509 *crt, int nid, char *value);
 static char * strdup(const char *src);
-static int parse_config(char *conf_file);
 
 int main(int argc, char *argv[])
 {
@@ -101,21 +94,21 @@ int main(int argc, char *argv[])
 #undef _GNU_SOURCE
 	initialize_crypto();
 
-	cndtr  = malloc(sizeof(cndtr_t));
+	conf  = malloc(sizeof(config_t));
 	char *home = getenv("HOME");
 	char *etc  = "/etc/conductor.conf";
 	strcat(home, "/.cndtrc");
-	parse_config(etc);
-	parse_config(home);
+	parse_config_file(conf, etc);
+	parse_config_file(conf, home);
 	EVP_PKEY *in_key = NULL;
 	X509     *in_crt = NULL;
 	char *REQ_DN_CA;
-	REQ_DN_CA = malloc(strlen(cndtr->organization) + 24);
-	strcpy(REQ_DN_CA, cndtr->organization);
+	REQ_DN_CA = malloc(strlen(conf->org.o) + 24);
+	strcpy(REQ_DN_CA, conf->org.o);
 	strcat(REQ_DN_CA, " Root CA");
 	char *REQ_DN_IN;
-	REQ_DN_IN = malloc(strlen(cndtr->organization) + 24);
-	strcpy(REQ_DN_IN, cndtr->organization);
+	REQ_DN_IN = malloc(strlen(conf->org.o) + 24);
+	strcpy(REQ_DN_IN, conf->org.o);
 	strcat(REQ_DN_IN, " Intermediate CA");
 	X509     *ca_crt = NULL;
 
@@ -203,63 +196,6 @@ int main(int argc, char *argv[])
 
 	return 0;
 }
-
-static int parse_config(char *conf_file) /* {{{ */
-{
-	int ret = 0;
-	if (access(conf_file, F_OK) == -1)
-		return 0;
-	FILE *fp = fopen(conf_file, "r");
-
-	if (fp == NULL)
-		return 1;
-	fseek(fp, 0, SEEK_END);
-	long fsize = ftell(fp);
-	fseek(fp, 0, SEEK_SET);
-
-	char *file = malloc(fsize + 1);
-	fread(file, fsize, 1, fp);
-	fclose(fp);
-	file[fsize] = 0;
-	char *tok;
-	char *delims = "\n\r";
-	int i = 0;
-	char *key, *val;
-	tok = strtok(file, delims);
-	while (tok != NULL) {
-		val = strchr(tok, '=');
-		val++;
-		i = strcspn(tok, val);
-		key = strdup(tok);
-		key[i + 1] = '\0';
-		/* Trim whitespace from beginning and end of keys and values */
-		i = 0;
-		while (key[i] == ' ' || key[i] == '\t') { key++; i++; }
-		i = 0;
-		while (val[i] == ' ' || val[i] == '\t') { val++; i++; }
-		i = strlen(key) - 1;
-		while (key[i] == ' ' || key[i] == '\t') { key[i] = '\0'; i--; }
-		i = strlen(val) - 1;
-		while (val[i] == ' ' || val[i] == '\t') { val[i] = '\0'; i--; }
-
-		if (strcmp(key, "OU") == 0) {
-			cndtr->unit = strdup(val);
-		} else if (strcmp(key, "ST") == 0) {
-			cndtr->state = strdup(val);
-		} else if (strcmp(key, "C") == 0) {
-			cndtr->country = strdup(val);
-		} else if (strcmp(key, "L") == 0) {
-			cndtr->locality = strdup(val);
-		} else if (strcmp(key, "O") == 0) {
-			cndtr->organization = strdup(val);
-		}
-		memset(tok, 0, strlen(tok)+1);
-		tok = strtok(NULL, delims);
-	}
-
-	return ret;
-}
-/* }}} */
 
 void seed_entropy(void) /* {{{ */
 {
@@ -399,8 +335,8 @@ int generate_pair(EVP_PKEY *ca_key, X509 *ca_crt, EVP_PKEY **key, X509 **crt, in
 
 	X509V3_CTX      v3ctx;
 	char *NS_COMMENT;
-	NS_COMMENT = malloc(strlen(cndtr->organization) + 20);
-	strcpy(NS_COMMENT, cndtr->organization);
+	NS_COMMENT = malloc(strlen(conf->org.o) + 20);
+	strcpy(NS_COMMENT, conf->org.o);
 	strcat(NS_COMMENT, " Certificate");
 
 	if (CERT_TYPE & TYPE_ca)
@@ -536,11 +472,11 @@ int generate_key_csr(EVP_PKEY **key, X509_REQ **req, char *CN) /* {{{ */
 
 	#define addName(field, value) X509_NAME_add_entry_by_txt(name, field,  MBSTRING_ASC, (unsigned char *)value, -1, -1, 0)
 	X509_NAME *name = X509_REQ_get_subject_name(*req);
-	addName("C",  cndtr->country);
-	addName("ST", cndtr->state);
-	addName("L",  cndtr->locality);
-	addName("O",  cndtr->organization);
-	addName("OU", cndtr->unit);
+	addName("C",  conf->org.c);
+	addName("ST", conf->org.st);
+	addName("L",  conf->org.l);
+	addName("O",  conf->org.o);
+	addName("OU", conf->org.ou);
 	addName("CN", CN);
 	#undef addName
 
