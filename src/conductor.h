@@ -45,5 +45,6 @@ typedef struct {
 	} log;
 } config_t;
 
-int serve(config_t *conf);
+#define RSA_KEY_BITS (4096)
+
 #endif

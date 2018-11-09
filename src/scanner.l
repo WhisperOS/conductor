@@ -39,7 +39,7 @@ INT          ([0-9]+)
 STRING       ([0-9A-Za-z_\/:\.\-]+)
 SENTANCE     ("[0-9A-Za-z_\/:\.\-\ ]+")
 LDAPDN       ([0-9A-Za-z_\/:\-\=,]+)
-PASSWD       ("[0-9A-Za-z_\/\-\=\/\:\.#!@$%^&\*\[\}\{\\];"'\?,]+")
+PASSWD       ("[0-9A-Za-z_\/\-\=\/\:\.#!@$%^&\*\[\}\{\\]\;\?,]+")
 
 %%
 
@@ -117,6 +117,24 @@ PASSWD       ("[0-9A-Za-z_\/\-\=\/\:\.#!@$%^&\*\[\}\{\\];"'\?,]+")
 	            yylval.string = strdup(yytext);
 	            return STRING;
 	          }
+	{LDAPDN}  {
+	            yylval.string = strdup(yytext);
+	            return STRING;
+	          }
+	{PASSWD}  {
+	            char *temp = strdup(yytext);
+	            temp++;
+	            temp[strlen(temp) - 1] = 0;
+	            yylval.string = strdup(temp);
+	            return STRING;
+	          }
+	{SENTANCE}  {
+	              char *temp = strdup(yytext);
+	              temp++;
+	              temp[strlen(temp) - 1] = 0;
+	              yylval.string = strdup(temp);
+	              return STRING;
+	            }
 	#.*       /* ignore comments */;
 	[\n\r]*   /* ignore new lines */;
 	[\t ]*    /* ignore whitespace */;

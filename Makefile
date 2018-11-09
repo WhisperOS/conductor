@@ -59,5 +59,5 @@ install: conductor doc
 	rm conductor.1.gz
 
 clean:
-	rm -f conductor *.o src/*.o
+	rm -f conductor *.o src/*.o src/parse.[ch] src/scanner.c
 	rm -f *.pem
