@@ -50,7 +50,7 @@ char temp[1024];
 %token CERT;
 %token CA;
 %token SESSIONS;
-%token LDAP;
+%token LDAP_;
 %token KRB5;
 %token ORG;
 %token O;
@@ -71,7 +71,7 @@ char temp[1024];
 configuration:
 	| configuration config
 	| configuration LOG optional_eol '{' log_section '}'
-	| configuration LDAP optional_eol '{' ldap_section '}'
+	| configuration LDAP_ optional_eol '{' ldap_section '}'
 	| configuration KRB5 optional_eol '{' krb5_section '}'
 	| configuration ORG optional_eol '{' org_section '}'
 	;

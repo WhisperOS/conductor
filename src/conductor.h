@@ -8,6 +8,8 @@
 
 #include <lber.h>
 
+#include <ldap.h>
+
 typedef struct {
 	int     daemonize;
 	int     workers;
@@ -56,9 +58,11 @@ typedef struct {
 } ccert_t;
 
 #define RSA_KEY_BITS (4096)
+#define VERSION ("0.0.1")
+
 
 void conductor_defaults(config_t *conf);
 int auth(config_t *conf);
 int initialize(LDAP *ld, config_t *conf, ccert_t *ca, ccert_t *in);
-
+void metadata(LDAP *ld, config_t *conf);
 #endif

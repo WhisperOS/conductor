@@ -65,7 +65,7 @@ int main(int argc, char *argv[])
 			// do nothing
 		case 'h':
 		case '?':
-			printf("%s v%s\n\n", "conductor", "0.0.1"); // VERSION
+			printf("%s v%s\n\n", "conductor", VERSION);
 			printf("Usage:\n"
 			       "  %s [-h?] [-d domain] [-i ipaddress]  user|server|both  CN|address|email\n\n",
 			       "conductor"); // BINARY

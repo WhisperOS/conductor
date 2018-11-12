@@ -58,7 +58,7 @@ SENTANCE     ([0-9A-Za-z_\/:\.\-]+)
 	key      { return KEY;      }
 	log      { return LOG;      }
 
-	ldap   { return LDAP; }
+	ldap   { return LDAP_; }
 	uri    { return URI;  }
 	dn     { return DN;   }
 	binddn { return BIND; }
