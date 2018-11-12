@@ -179,56 +179,111 @@ void print_attr(LDAP *ld, char *dn, char *att)
 	ldap_memfree(attr_name);
 }
 
+static void mod_add_strings(LDAPMod *mod, char *type, char **vals)
+{
+	mod = malloc(sizeof(LDAPMod));
+	mod->mod_type   = type;
+	mod->mod_values = vals;
+}
+
+static int mod_add_cert(LDAPMod *mod, char *type, X509 *crt)
+{
+	mod = malloc(sizeof(LDAPMod));
+	mod->mod_op    =  LDAP_MOD_BVALUES;
+	mod->mod_type  = type;
+	struct berval *conductorCertVals[2];
+	BIO *bio = BIO_new(BIO_s_mem());
+	if (!PEM_write_bio_X509(bio, crt))
+		return 1;
+	BUF_MEM *bptr;
+	BIO_get_mem_ptr(bio, &bptr);
+	conductorCertVals[0]->bv_len = bptr->length;
+	memcpy(conductorCertVals[0]->bv_val, bptr->data, bptr->length);
+	conductorCertVals[1] = NULL;
+	mod->mod_values = (char **) conductorCertVals;
+	BIO_free_all(bio);
+
+	return 0;
+}
+
+static int mod_add_key(LDAPMod *mod, char *type, EVP_PKEY *key)
+{
+	mod = malloc(sizeof(LDAPMod));
+	mod->mod_op   =  LDAP_MOD_BVALUES;
+	mod->mod_type = type;
+	struct berval *conductorKeyVals[2];
+	BIO *bio = BIO_new(BIO_s_mem());
+	if (!PEM_write_bio_PrivateKey(bio, key, NULL, NULL, 0, NULL, NULL))
+		return 1;
+	BUF_MEM *bptr;
+	BIO_get_mem_ptr(bio, &bptr);
+	conductorKeyVals[0]->bv_len = bptr->length;
+	memcpy(conductorKeyVals[0]->bv_val, bptr->data, bptr->length);
+	conductorKeyVals[1] = NULL;
+	mod->mod_values = (char **) conductorKeyVals;
+	BIO_free_all(bio);
+
+	return 0;
+}
+
 int upload_cert(LDAP *ld, ccert_t *cert)
 {
 	int rc;
 	LDAPMod **mods;
 	mods = malloc(sizeof(LDAPMod *) * 5);
 
-	mods[0] = malloc(sizeof(LDAPMod));
-	mods[0]->mod_type   = "cn";
 	char *cn[] = { cert->cn, NULL };
-	mods[0]->mod_values = cn;
+	mod_add_strings(mods[0], "cn", cn);
 
-	mods[1] = malloc(sizeof(LDAPMod));
-	mods[1]->mod_type   = "objectClass";
-	char *class[] = { "conductorEntry", "top", NULL };
-	mods[1]->mod_values = class;
+	char *val[] = { "conductor", "top", NULL };
+	mod_add_strings(mods[1], "objectClass", val);
 
-	mods[2] = malloc(sizeof(LDAPMod));
-	mods[2]->mod_op     =  LDAP_MOD_BVALUES;
-	mods[2]->mod_type   = "conductorCert";
-	struct berval *conductorCertVals[2];
-	BIO *bio = BIO_new(BIO_s_mem());
-	if (!PEM_write_bio_X509(bio, cert->crt))
-		return 1;
-	BUF_MEM *bptr;
-	BIO_get_mem_ptr(bio, &bptr);
-	conductorCertVals[0]->bv_len = bptr->length;
-	conductorCertVals[0]->bv_val = bptr->data;
-	conductorCertVals[1] = NULL;
-	mods[2]->mod_values = (char **) conductorCertVals;
-	BIO_free_all(bio);
-
-	mods[3] = malloc(sizeof(LDAPMod));
-	mods[3]->mod_op     =  LDAP_MOD_BVALUES;
-	mods[3]->mod_type   = "conductorKey";
-
-	struct berval *conductorKeyVals[2];
-	bio = BIO_new(BIO_s_mem());
-	if (!PEM_write_bio_PrivateKey(bio, cert->key, NULL, NULL, 0, NULL, NULL))
-		return 1;
-	BIO_get_mem_ptr(bio, &bptr);
-	conductorKeyVals[0]->bv_len = bptr->length;
-	conductorKeyVals[0]->bv_val = bptr->data;
-	conductorKeyVals[1] = NULL;
-	mods[3]->mod_values = (char **) conductorKeyVals;
-	BIO_free_all(bio);
+	mod_add_cert(mods[2], "conductorCert", cert->crt);
+	mod_add_key(mods[3], "conductorKey", cert->key);
 
 	mods[4] = (LDAPMod *) NULL;
 
-	if ((rc = ldap_add_ext_s(ld, cert->dn, mods, NULL, NULL)) != LDAP_SUCCESS) {
-		printf("ldap failed to add (%d) [%s]\n", rc, ldap_err2string(rc));
-	}
-	return 0;
+	if ((rc = ldap_add_ext_s(ld, cert->dn, mods, NULL, NULL)) != LDAP_SUCCESS)
+		printf("ldap failed to add cert, %s (%d) [%s]\n", cert->cn, rc, ldap_err2string(rc));
+
+	return rc;
+}
+
+int initialize(LDAP *ld, config_t *conf, ccert_t *ca, ccert_t *in)
+{
+	int rc = 0;
+	char *dn = "cn=conductor,";
+	strcat(dn, conf->ldap.dn);
+
+	LDAPMod **mods;
+	mods = malloc(sizeof(LDAPMod *) * 12);
+	char *cn[] = { "cn=conductor", NULL };
+	mod_add_strings(mods[0], "cn", cn);
+
+	char *val[] = { "conductorContainer", "top", NULL };
+	mod_add_strings(mods[1], "objectClass", val);
+
+	mod_add_cert(mods[2], "conductorCaCert", ca->crt);
+	mod_add_key(mods[3], "conductorCaKey", ca->key);
+
+	mod_add_cert(mods[4], "conductorIntermediateCert", in->crt);
+	mod_add_key(mods[5], "conductorIntermediateKey", in->key);
+
+	char *o[]  = { conf->org.o,  NULL };
+	mod_add_strings(mods[6], "o", o);
+	char *ou[] = { conf->org.ou, NULL };
+	mod_add_strings(mods[7], "ou", ou);
+	char *l[]  = { conf->org.l,  NULL };
+	mod_add_strings(mods[8], "l", l);
+	char *st[] = { conf->org.st, NULL };
+	mod_add_strings(mods[9], "st", st);
+	char *c[]  = { conf->org.c,  NULL };
+	mod_add_strings(mods[10], "c", c);
+
+	mods[11] = (LDAPMod *) NULL;
+
+	if ((rc = ldap_add_ext_s(ld, dn, mods, NULL, NULL)) != LDAP_SUCCESS)
+		printf("ldap failed to initialize conductor container (%d) [%s]\n", rc, ldap_err2string(rc));
+
+	return rc;
 }

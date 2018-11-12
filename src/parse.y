@@ -65,7 +65,7 @@ char temp[1024];
 %token BIND;
 %token PW;
 
-%type <string> sentance;
+%type <string> sentence;
 %%
 
 configuration:
@@ -121,7 +121,7 @@ org_section:
 	| org_section org_statement
 	;
 
-sentance: sentance STRING { strcat($1, " "); strcat($1, $2); $$ = $1; }
+sentence: sentence STRING { strcat($1, " "); strcat($1, $2); $$ = $1; }
 	| STRING
 	;
 
@@ -130,7 +130,7 @@ org_statement:
 	| ST STRING   { p_config->org.st = $2; }
 	| L  STRING   { p_config->org.l  = $2; }
 	| OU STRING   { p_config->org.ou = $2; }
-	| O  sentance { p_config->org.o  = $2; }
+	| O  sentence { p_config->org.o  = $2; }
 	;
 
 optional_eol:

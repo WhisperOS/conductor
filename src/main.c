@@ -43,6 +43,7 @@ int main(int argc, char *argv[])
 
 #define _GNU_SOURCE
 	struct option long_opts[] = {
+		{ "file",   required_argument, NULL, 'f' },
 		{ "help",   no_argument,       NULL, 'h' },
 		{ "ip",     required_argument, NULL, 'i' },
 		{ "domain", required_argument, NULL, 'd' },
@@ -56,10 +57,12 @@ int main(int argc, char *argv[])
 	domains = malloc(sizeof(char *) * 20);
 	for (;;) {
 		int idx = 1;
-		int c = getopt_long(argc, argv, "h?i:+d:+", long_opts, &idx);
+		int c = getopt_long(argc, argv, "f:h?i:+d:+", long_opts, &idx);
 		if (c == -1) break;
 
 		switch (c) {
+		case 'f':
+			// do nothing
 		case 'h':
 		case '?':
 			printf("%s v%s\n\n", "conductor", "0.0.1"); // VERSION
