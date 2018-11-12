@@ -49,10 +49,10 @@ typedef struct {
 } config_t;
 
 typedef struct {
-	BUF_MEM *cert;
-	BUF_MEM *key;
-	char *dn;
-	char *cn;
+	X509     *crt;
+	EVP_PKEY *key;
+	char     *dn;
+	char     *cn; // Common name of the cert and ldap entry
 } ccert_t;
 
 #define RSA_KEY_BITS (4096)

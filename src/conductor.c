@@ -8,6 +8,12 @@
 #include <sasl/sasl.h>
 #include <krb5.h>
 
+#include <openssl/err.h>
+#include <openssl/conf.h>
+#include <openssl/pem.h>
+#include <openssl/rand.h>
+#include <openssl/x509v3.h>
+
 #include "conductor.h"
 
 #define CC_NAME "MEMORY:krb5-conductor"
@@ -138,15 +144,50 @@ int auth(config_t *conf)
 done:
 	return rc;
 }
-/*
+
+void print_attr(LDAP *ld, char *dn, char *att)
+{
+	LDAPMessage *result = NULL, *e;
+	int rc;
+	char *attrs[] = { att,  NULL};
+	if ((rc = ldap_search_ext_s(ld, dn, LDAP_SCOPE_SUBTREE, NULL, attrs, 0, NULL, NULL, LDAP_NO_LIMIT,
+		LDAP_NO_LIMIT, &result)) != LDAP_SUCCESS) {
+		printf("ldap search failure (%d) [%s]\n", rc, ldap_err2string(rc));
+		exit(1);
+	}
+	if ((e = ldap_first_entry(ld, result)) == NULL) {
+		printf("no results\n");
+		exit(0);
+	}
+	char *attr_name;
+	BerElement *ber;
+	struct berval **vals;
+	for (attr_name = ldap_first_attribute(ld, e, &ber); attr_name != NULL;
+			attr_name = ldap_next_attribute(ld, e, ber)) {
+		printf("%s: ", attr_name);
+		if ((vals = ldap_get_values_len(ld, e, attr_name)) != NULL) {
+			for (int i = 0; vals[i] != NULL; i++) {
+				if (i == 0)
+					printf("%s", vals[i]->bv_val);
+				else
+					printf(", %s", vals[i]->bv_val);
+			}
+			ldap_value_free_len(vals);
+		}
+		printf("\n");
+	}
+	ldap_memfree(attr_name);
+}
+
 int upload_cert(LDAP *ld, ccert_t *cert)
 {
+	int rc;
 	LDAPMod **mods;
-	mods = malloc(sizeof(LDAPMod *) * 3);
+	mods = malloc(sizeof(LDAPMod *) * 5);
 
 	mods[0] = malloc(sizeof(LDAPMod));
 	mods[0]->mod_type   = "cn";
-	char *cn[] = { "titan01.iag.d3fy.net", NULL };
+	char *cn[] = { cert->cn, NULL };
 	mods[0]->mod_values = cn;
 
 	mods[1] = malloc(sizeof(LDAPMod));
@@ -154,65 +195,40 @@ int upload_cert(LDAP *ld, ccert_t *cert)
 	char *class[] = { "conductorEntry", "top", NULL };
 	mods[1]->mod_values = class;
 
-	FILE *fh;
-	struct stat st;
-
-	char *cert_data;
-	struct berval cert_berval;
-	struct berval *conductorCertVals[2];
-	if (stat("../titan01.iag.d3fy.net.cert.pem", &st) != 0) {
-		printf("error stating cert\n");
-		return 1;
-	}
-	if ((fh = fopen("../titan01.iag.d3fy.net.cert.pem", "rb")) == NULL) {
-		printf("error opening cert file\n");
-		return 1;
-	}
-	if (((cert_data = (char *)malloc(st.st_size)) == NULL) ||
-		(fread(cert_data, st.st_size, 1, fh) != 1)) {
-		printf("error reading cert file\n");
-		return 1;
-	}
-	fclose(fh);
 	mods[2] = malloc(sizeof(LDAPMod));
 	mods[2]->mod_op     =  LDAP_MOD_BVALUES;
 	mods[2]->mod_type   = "conductorCert";
-	cert_berval.bv_len = st.st_size;
-	cert_berval.bv_val = cert_data;
-	conductorCertVals[0] = &cert_berval;
+	struct berval *conductorCertVals[2];
+	BIO *bio = BIO_new(BIO_s_mem());
+	if (!PEM_write_bio_X509(bio, cert->crt))
+		return 1;
+	BUF_MEM *bptr;
+	BIO_get_mem_ptr(bio, &bptr);
+	conductorCertVals[0]->bv_len = bptr->length;
+	conductorCertVals[0]->bv_val = bptr->data;
 	conductorCertVals[1] = NULL;
-	mods[2]->mod_values = conductorCertVals;
+	mods[2]->mod_values = (char **) conductorCertVals;
+	BIO_free_all(bio);
 
-	char *key_data;
-	struct berval key_berval;
-	struct berval *conductorKeyVals[2];
-	if (stat("../titan01.iag.d3fy.net.key.pem", &st) != 0) {
-		printf("error stating key\n");
-		return 1;
-	}
-	if ((fh = fopen("../titan01.iag.d3fy.net.key.pem", "rb")) == NULL) {
-		printf("error opening cert file\n");
-		return 1;
-	}
-	if (((key_data = (char *)malloc(st.st_size)) == NULL) ||
-		(fread(key_data, st.st_size, 1, fh) != 1)) {
-		printf("error reading cert file\n");
-		return 1;
-	}
-	fclose(fh);
 	mods[3] = malloc(sizeof(LDAPMod));
 	mods[3]->mod_op     =  LDAP_MOD_BVALUES;
 	mods[3]->mod_type   = "conductorKey";
-	key_berval.bv_len = st.st_size;
-	key_berval.bv_val = key_data;
-	conductorKeyVals[0] = &key_berval;
+
+	struct berval *conductorKeyVals[2];
+	bio = BIO_new(BIO_s_mem());
+	if (!PEM_write_bio_PrivateKey(bio, cert->key, NULL, NULL, 0, NULL, NULL))
+		return 1;
+	BIO_get_mem_ptr(bio, &bptr);
+	conductorKeyVals[0]->bv_len = bptr->length;
+	conductorKeyVals[0]->bv_val = bptr->data;
 	conductorKeyVals[1] = NULL;
-	mods[3]->mod_values = conductorKeyVals;
+	mods[3]->mod_values = (char **) conductorKeyVals;
+	BIO_free_all(bio);
+
 	mods[4] = (LDAPMod *) NULL;
 
-	if ((rc = ldap_add_ext_s(ld, "cn=titan01.iag.d3fy.net,cn=conductor,dc=d3fy,dc=net", mods, NULL, NULL)) != LDAP_SUCCESS) {
+	if ((rc = ldap_add_ext_s(ld, cert->dn, mods, NULL, NULL)) != LDAP_SUCCESS) {
 		printf("ldap failed to add (%d) [%s]\n", rc, ldap_err2string(rc));
 	}
 	return 0;
 }
-*/

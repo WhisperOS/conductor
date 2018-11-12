@@ -245,15 +245,6 @@ int save_key(const char *key_path, EVP_PKEY **key) /* {{{ */
 	if (!PEM_write_bio_PrivateKey(bio, *key, NULL, NULL, 0, NULL, NULL)) goto err;
 	BIO_free_all(bio);
 	chmod(key_path, S_IRUSR|S_IWUSR);
-
-	/*
-	bio = BIO_new(BIO_s_mem());
-	if (!PEM_write_bio_PrivateKey(bio, *key, NULL, NULL, 0, NULL, NULL)) goto err;
-	BUF_MEM *bptr;
-	BIO_get_mem_ptr(bio, &bptr);
-	fprintf(stderr, "%s\n", bptr->data); // bptr->length
-	// BIO_set_close(bio, BIO_NOCLOSE);
-	*/
 	BIO_free_all(bio);
 	return 0;
 err:
