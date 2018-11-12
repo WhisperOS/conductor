@@ -58,8 +58,8 @@ typedef struct {
 } ccert_t;
 
 #define RSA_KEY_BITS (4096)
-#define VERSION ("v0.5.0-16-gf81a328")
-#define PACKAGE_URL ("https://github.com/WhisperOS/conductor")
+#define VERSION ("@VERSION@")
+#define PACKAGE_URL ("@PACKAGE_URL@")
 
 
 void conductor_defaults(config_t *conf);

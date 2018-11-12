@@ -78,7 +78,7 @@ int main(int argc, char *argv[])
 				   "                      Add a SAN domain, optional, and can be called multiple times\n");
 			printf("\n");
 
-			printf("See also:\n  %s\n", "https://github.com/WhisperOS/conductor"); // PACKAGE_URL);
+			printf("See also:\n  %s\n", PACKAGE_URL);
 
 			exit(EXIT_SUCCESS);
 

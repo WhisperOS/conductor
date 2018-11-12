@@ -14,3 +14,4 @@ man/ldif/
 src/parse.c
 src/parse.h
 src/scanner.c
+src/conductor.h

@@ -4,13 +4,15 @@ LDFLAGS  =
 LIBS     = -lcrypto -lkrb5 -lcom_err -lldap -lgssapi_krb5 -lsasl2
 PREFIX  ?= /usr/local
 DESTDIR ?=
+
 VERSION = $(shell git describe --tags | head -n1)
+PACKAGE_URL = $(shell git config --get remote.origin.url | sed -e s/^git\@// -e "s/^github.com:/https:\/\/github.com\//" -e "s/\.git$$//" )
 
 OBJS += 
 
 BINS = conductor
 
-conductor_OBJS := $(OBJS) src/parse.o src/scanner.o src/conductor.o src/main.o
+conductor_OBJS := src/conductor.h $(OBJS) src/parse.o src/scanner.o src/conductor.o src/main.o
 
 all: $(BINS)
 
@@ -31,6 +33,9 @@ src/parse.c: src/parse.y
 src/%.o: src/%.c
 	$(CC) -c -o $@ $(CFLAGS) $(CXXFLAGS) $<
 
+src/%.h: src/%.h.in
+	sed -e 's/@VERSION@/$(VERSION)/g' \
+		-e 's$$@PACKAGE_URL@$$$(PACKAGE_URL)$$g' $< > $@
 
 schema:
 	rm -rf man/ldif
@@ -59,5 +64,5 @@ install: conductor doc
 	rm conductor.1.gz
 
 clean:
-	rm -f conductor *.o src/*.o src/parse.[ch] src/scanner.c
+	rm -f conductor *.o src/*.o src/parse.[ch] src/scanner.c src/conductor.h
 	rm -f *.pem
