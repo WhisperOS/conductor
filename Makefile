@@ -10,7 +10,7 @@ OBJS +=
 
 BINS = conductor
 
-conductor_OBJS := $(OBJS) src/parse.o src/scanner.o src/main.o
+conductor_OBJS := $(OBJS) src/parse.o src/scanner.o src/conductor.o src/main.o
 
 all: $(BINS)
 

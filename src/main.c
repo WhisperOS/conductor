@@ -62,7 +62,7 @@ int main(int argc, char *argv[])
 		switch (c) {
 		case 'h':
 		case '?':
-			printf("%s v%s\n\n", "conductor", "0.0.1"); // BINARY, VERSION
+			printf("%s v%s\n\n", "conductor", "0.0.1"); // VERSION
 			printf("Usage:\n"
 			       "  %s [-h?] [-d domain] [-i ipaddress]  user|server|both  CN|address|email\n\n",
 			       "conductor"); // BINARY
@@ -96,10 +96,12 @@ int main(int argc, char *argv[])
 
 	conf  = malloc(sizeof(config_t));
 	char *home = getenv("HOME");
-	char *etc  = "/etc/conductor.conf";
+	//char *etc  = "/etc/conductor.conf";
 	strcat(home, "/.cndtrc");
-	parse_config_file(conf, etc);
-	parse_config_file(conf, home);
+	conductor_defaults(conf);
+	// if (parse_config_file(conf, etc) != 0)  printf("crud?\n");
+	if (parse_config_file(conf, home) != 0) printf("crud?\n");
+
 	EVP_PKEY *in_key = NULL;
 	X509     *in_crt = NULL;
 	char *REQ_DN_CA;
@@ -243,6 +245,16 @@ int save_key(const char *key_path, EVP_PKEY **key) /* {{{ */
 	if (!PEM_write_bio_PrivateKey(bio, *key, NULL, NULL, 0, NULL, NULL)) goto err;
 	BIO_free_all(bio);
 	chmod(key_path, S_IRUSR|S_IWUSR);
+
+	/*
+	bio = BIO_new(BIO_s_mem());
+	if (!PEM_write_bio_PrivateKey(bio, *key, NULL, NULL, 0, NULL, NULL)) goto err;
+	BUF_MEM *bptr;
+	BIO_get_mem_ptr(bio, &bptr);
+	fprintf(stderr, "%s\n", bptr->data); // bptr->length
+	// BIO_set_close(bio, BIO_NOCLOSE);
+	*/
+	BIO_free_all(bio);
 	return 0;
 err:
 	return 1;

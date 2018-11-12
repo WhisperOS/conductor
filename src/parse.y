@@ -6,6 +6,7 @@
 #include <errno.h>
 #include <arpa/inet.h>
 
+#include "utils.h"
 #include "conductor.h"
 #include "config_file.h"
 
@@ -16,6 +17,7 @@ void yyerror(char *str, ...);
 int  yyval;
 int  yyparse();
 
+char temp[1024];
 %}
 
 
@@ -33,7 +35,6 @@ int  yyparse();
 %token <string> LOG_TYPE;
 %token <string> LOG_LEVEL;
 %token <string> SENTANCE;
-%token <string> LDAPDN;
 %token <string> PASSWD;
 
 %token PIDFILE;
@@ -64,6 +65,7 @@ int  yyparse();
 %token BIND;
 %token PW;
 
+%type <string> sentance;
 %%
 
 configuration:
@@ -101,36 +103,41 @@ krb5_section:
 	;
 
 krb5_statement:
-	  KEYTAB STRING { p_config->krb.keytab    = $2; }
-	| PRINC  STRING { p_config->krb.principal = $2; }
+	  KEYTAB STRING { p_config->krb5.keytab    = $2; }
+	| PRINC  STRING { p_config->krb5.principal = $2; }
 
 ldap_section:
 	| ldap_section ldap_statement
 	;
 
 ldap_statement:
-	  URI    LDAPDN { p_config->ldap.uri   = $2; }
-	| DN     LDAPDN { p_config->ldap.dn    = $2; }
-	| BIND   LDAPDN { p_config->ldap.bind  = $2; }
+	  URI    STRING { p_config->ldap.uri   = $2; }
+	| DN     STRING { p_config->ldap.dn    = $2; }
+	| BIND   STRING { p_config->ldap.bind  = $2; }
 	| PW     PASSWD { p_config->ldap.pw    = $2; }
+	| PW     STRING { p_config->ldap.pw    = $2; }
 
 org_section:
 	| org_section org_statement
 	;
 
+sentance: sentance STRING { strcat($1, " "); strcat($1, $2); $$ = $1; }
+	| STRING
+	;
+
 org_statement:
-	  O  SENTANCE { p_config->org.o  = $2; }
-	| C  STRING   { p_config->org.c  = $2; }
+	  C  STRING   { p_config->org.c  = $2; }
 	| ST STRING   { p_config->org.st = $2; }
 	| L  STRING   { p_config->org.l  = $2; }
 	| OU STRING   { p_config->org.ou = $2; }
+	| O  sentance { p_config->org.o  = $2; }
+	;
 
 optional_eol:
 	| optional_eol '\n'
 	;
 
 %%
-
 
 void yyerror(char *str, ...)
 {
@@ -158,7 +165,7 @@ int parse_config_file (config_t *config_ref, const char *path)
 
 	yyin = fopen (path, "r");
 	if (yyin == NULL) {
-		fprintf (stderr, "can't open configuration file %s: %s\n", path, strerror(errno));
+		fprintf(stderr, "can't open configuration file %s: %s\n", path, strerror(errno));
 		return -1;
 	}
 

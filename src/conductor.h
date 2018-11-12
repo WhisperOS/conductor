@@ -4,6 +4,9 @@
 #include <arpa/inet.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <openssl/buffer.h>
+
+#include <lber.h>
 
 typedef struct {
 	int     daemonize;
@@ -24,7 +27,7 @@ typedef struct {
 	struct {
 		char *keytab;
 		char *principal;
-	} krb;
+	} krb5;
 	struct {
 		char *st;
 		char *ou;
@@ -45,6 +48,15 @@ typedef struct {
 	} log;
 } config_t;
 
+typedef struct {
+	BUF_MEM *cert;
+	BUF_MEM *key;
+	char *dn;
+	char *cn;
+} ccert_t;
+
 #define RSA_KEY_BITS (4096)
 
+void conductor_defaults(config_t *conf);
+int auth(config_t *conf);
 #endif

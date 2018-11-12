@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Dan Molik <dan@danmolik.com>
+ * Copyright 2015,2018 Dan Molik <dan@danmolik.com>
  *
  * This file is part of Shitty Little Server
  *
@@ -36,10 +36,9 @@ LOG_LEVEL    (?i:warn|warning|error|notice|debug|info|crit|critical|emerg|emerge
 LOG_FACILITY (?i:kern|user|mail|daemon|auth|syslog|lpr|news|uucp|clock|12|13|14|authpriv|ftp|cron|local[0-7])
 DECIMAL      ([0-9]+\.[0-9]+)
 INT          ([0-9]+)
-STRING       ([0-9A-Za-z_\/:\.\-]+)
-SENTANCE     ("[0-9A-Za-z_\/:\.\-\ ]+")
-LDAPDN       ([0-9A-Za-z_\/:\-\=,]+)
-PASSWD       ("[0-9A-Za-z_\/\-\=\/\:\.#!@$%^&\*\[\}\{\\]\;\?,]+")
+STRING       ([0-9A-Za-z_\/:\-\=,\.]+)
+PASSWD       ([0-9A-Za-z_\/\-\=\/\:\.\!\@\$\%^&\*\[\}\{\\]\;\?,]+)
+SENTANCE     ([0-9A-Za-z_\/:\.\-]+)
 
 %%
 
@@ -72,9 +71,10 @@ PASSWD       ("[0-9A-Za-z_\/\-\=\/\:\.#!@$%^&\*\[\}\{\\]\;\?,]+")
 	st  { return ST;  }
 	ou  { return OU;  }
 
-	krb5 { return KRB5; }
-	keytab { return KEYTAB; }
-	princ  { return PRINC; }
+	krb5       { return KRB5; }
+	keytab     { return KEYTAB; }
+	princ      { return PRINC; }
+	principal  { return PRINC; }
 }
 
 <LIST>{
@@ -117,27 +117,13 @@ PASSWD       ("[0-9A-Za-z_\/\-\=\/\:\.#!@$%^&\*\[\}\{\\]\;\?,]+")
 	            yylval.string = strdup(yytext);
 	            return STRING;
 	          }
-	{LDAPDN}  {
+	{PASSWD}  {
 	            yylval.string = strdup(yytext);
 	            return STRING;
 	          }
-	{PASSWD}  {
-	            char *temp = strdup(yytext);
-	            temp++;
-	            temp[strlen(temp) - 1] = 0;
-	            yylval.string = strdup(temp);
-	            return STRING;
-	          }
-	{SENTANCE}  {
-	              char *temp = strdup(yytext);
-	              temp++;
-	              temp[strlen(temp) - 1] = 0;
-	              yylval.string = strdup(temp);
-	              return STRING;
-	            }
 	#.*       /* ignore comments */;
 	[\n\r]*   /* ignore new lines */;
-	[\t ]*    /* ignore whitespace */;
+	[\ \t]*   /* ignore whitespace */;
 	\\\n      /* ignore linebreaks */;
 	.|\n      { return *yytext; }
 }
