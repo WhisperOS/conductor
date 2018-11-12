@@ -8,7 +8,7 @@ DESTDIR ?=
 VERSION = $(shell git describe --tags | head -n1)
 PACKAGE_URL = $(shell git config --get remote.origin.url | sed -e s/^git\@// -e "s/^github.com:/https:\/\/github.com\//" -e "s/\.git$$//" )
 
-OBJS += 
+OBJS += src/utils.o src/log.o
 
 BINS = conductor
 
@@ -64,5 +64,5 @@ install: conductor doc
 	rm conductor.1.gz
 
 clean:
-	rm -f conductor *.o src/*.o src/parse.[ch] src/scanner.c src/conductor.h
+	rm -f $(BINS) src/conductor.h src/*.o src/parse.[ch] src/scanner.c
 	rm -f *.pem
