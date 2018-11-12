@@ -165,7 +165,7 @@ int parse_config_file (config_t *config_ref, const char *path)
 
 	yyin = fopen (path, "r");
 	if (yyin == NULL) {
-		fprintf(stderr, "can't open configuration file %s: %s\n", path, strerror(errno));
+		fprintf(stderr, "can't open configuration file %s: %s, skipping\n", path, strerror(errno));
 		return -1;
 	}
 

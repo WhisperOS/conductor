@@ -179,14 +179,14 @@ void print_attr(LDAP *ld, char *dn, char *att)
 	ldap_memfree(attr_name);
 }
 
-static void mod_add_strings(LDAPMod *mod, char *type, char **vals)
+static void _mod_add_strings(LDAPMod *mod, char *type, char **vals)
 {
 	mod = malloc(sizeof(LDAPMod));
 	mod->mod_type   = type;
 	mod->mod_values = vals;
 }
 
-static int mod_add_cert(LDAPMod *mod, char *type, X509 *crt)
+static int _mod_add_cert(LDAPMod *mod, char *type, X509 *crt)
 {
 	mod = malloc(sizeof(LDAPMod));
 	mod->mod_op    =  LDAP_MOD_BVALUES;
@@ -206,7 +206,7 @@ static int mod_add_cert(LDAPMod *mod, char *type, X509 *crt)
 	return 0;
 }
 
-static int mod_add_key(LDAPMod *mod, char *type, EVP_PKEY *key)
+static int _mod_add_key(LDAPMod *mod, char *type, EVP_PKEY *key)
 {
 	mod = malloc(sizeof(LDAPMod));
 	mod->mod_op   =  LDAP_MOD_BVALUES;
@@ -233,13 +233,13 @@ int upload_cert(LDAP *ld, ccert_t *cert)
 	mods = malloc(sizeof(LDAPMod *) * 5);
 
 	char *cn[] = { cert->cn, NULL };
-	mod_add_strings(mods[0], "cn", cn);
+	_mod_add_strings(mods[0], "cn", cn);
 
 	char *val[] = { "conductor", "top", NULL };
-	mod_add_strings(mods[1], "objectClass", val);
+	_mod_add_strings(mods[1], "objectClass", val);
 
-	mod_add_cert(mods[2], "conductorCert", cert->crt);
-	mod_add_key(mods[3], "conductorKey", cert->key);
+	_mod_add_cert(mods[2], "conductorCert", cert->crt);
+	_mod_add_key(mods[3], "conductorKey", cert->key);
 
 	mods[4] = (LDAPMod *) NULL;
 
@@ -258,27 +258,27 @@ int initialize(LDAP *ld, config_t *conf, ccert_t *ca, ccert_t *in)
 	LDAPMod **mods;
 	mods = malloc(sizeof(LDAPMod *) * 12);
 	char *cn[] = { "cn=conductor", NULL };
-	mod_add_strings(mods[0], "cn", cn);
+	_mod_add_strings(mods[0], "cn", cn);
 
 	char *val[] = { "conductorContainer", "top", NULL };
-	mod_add_strings(mods[1], "objectClass", val);
+	_mod_add_strings(mods[1], "objectClass", val);
 
-	mod_add_cert(mods[2], "conductorCaCert", ca->crt);
-	mod_add_key(mods[3], "conductorCaKey", ca->key);
+	_mod_add_cert(mods[2], "conductorCaCert", ca->crt);
+	_mod_add_key(mods[3], "conductorCaKey", ca->key);
 
-	mod_add_cert(mods[4], "conductorIntermediateCert", in->crt);
-	mod_add_key(mods[5], "conductorIntermediateKey", in->key);
+	_mod_add_cert(mods[4], "conductorIntermediateCert", in->crt);
+	_mod_add_key(mods[5], "conductorIntermediateKey", in->key);
 
 	char *o[]  = { conf->org.o,  NULL };
-	mod_add_strings(mods[6], "o", o);
+	_mod_add_strings(mods[6], "o", o);
 	char *ou[] = { conf->org.ou, NULL };
-	mod_add_strings(mods[7], "ou", ou);
+	_mod_add_strings(mods[7], "ou", ou);
 	char *l[]  = { conf->org.l,  NULL };
-	mod_add_strings(mods[8], "l", l);
+	_mod_add_strings(mods[8], "l", l);
 	char *st[] = { conf->org.st, NULL };
-	mod_add_strings(mods[9], "st", st);
+	_mod_add_strings(mods[9], "st", st);
 	char *c[]  = { conf->org.c,  NULL };
-	mod_add_strings(mods[10], "c", c);
+	_mod_add_strings(mods[10], "c", c);
 
 	mods[11] = (LDAPMod *) NULL;
 

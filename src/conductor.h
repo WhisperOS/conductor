@@ -59,4 +59,6 @@ typedef struct {
 
 void conductor_defaults(config_t *conf);
 int auth(config_t *conf);
+int initialize(LDAP *ld, config_t *conf, ccert_t *ca, ccert_t *in);
+
 #endif
