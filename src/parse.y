@@ -18,6 +18,7 @@ int  yyval;
 int  yyparse();
 
 char temp[1024];
+int   len = 0;
 %}
 
 
@@ -121,7 +122,12 @@ org_section:
 	| org_section org_statement
 	;
 
-sentence: sentence STRING { strcat($1, " "); strcat($1, $2); $$ = $1; }
+sentence: sentence STRING {
+		                    if (len++ == 0)
+		                        strcat(temp, $1);
+		                    strcat(temp, " ");
+		                    strcat(temp, $2);
+		                  }
 	| STRING
 	;
 
@@ -130,7 +136,10 @@ org_statement:
 	| ST STRING   { p_config->org.st = $2; }
 	| L  STRING   { p_config->org.l  = $2; }
 	| OU STRING   { p_config->org.ou = $2; }
-	| O  sentence { p_config->org.o  = $2; }
+	| O  sentence { p_config->org.o  = strdup(temp);
+		            memset(temp, 0, 1024);
+		            len = 0;
+		          }
 	;
 
 optional_eol:
