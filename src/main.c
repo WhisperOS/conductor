@@ -38,7 +38,72 @@ static int save_cert(const char *crt_path, X509 **crt, X509 **in, X509 **ca);
 static int add_ext(X509V3_CTX *ctx, X509 *crt, int nid, char *value);
 static char * strdup(const char *src);
 
+static int new(int argc, char *argv[]);
+static int gen(int argc, char *argv[]);
+
 int main(int argc, char *argv[])
+{
+
+	if (argv[1] == NULL) {
+		printf("please provide a cmd\n");
+		return 1;
+	}
+	if (strcmp(argv[1], "init") == 0 || strcmp(argv[1], "new") == 0) {
+		return new(--argc, ++argv);
+	} else if (strcmp(argv[1], "gen") == 0) {
+		return gen(--argc, ++argv);
+	} else {
+		printf("cmd %s, is not a valid command\n", argv[1]);
+		return 1;
+	}
+
+	return 0;
+}
+
+int new(int argc, char *argv[])
+{
+	struct option long_opts[] = {
+		{ "file",   required_argument, NULL, 'f' },
+		{ "help",   no_argument,       NULL, 'h' },
+		{ "ip",     required_argument, NULL, 'i' },
+		{ "domain", required_argument, NULL, 'd' },
+		{ 0, 0, 0, 0 },
+	};
+	for (;;) {
+		int idx = 1;
+		int c = getopt_long(argc, argv, "f:h?i:+d:+", long_opts, &idx);
+		if (c == -1) break;
+
+		switch (c) {
+		case 'f':
+			// do nothing
+		case 'h':
+		case '?':
+			printf("%s v%s\n\n", "conductor", VERSION);
+			printf("Usage:\n"
+			       "  %s [-h?] [-d domain] [-i ipaddress]  user|server|both  CN|address|email\n\n",
+			       "conductor");
+
+			printf("Options:\n");
+			printf("  -?, -h, --help    show this help screen\n");
+			printf("  -i, --ip          <IP ADDRESS>\n"
+				   "                      Add a SAN IP, optional, and can be called multiple times\n");
+			printf("  -d, --domain      <DOMAIN NAME>\n"
+				   "                      Add a SAN domain, optional, and can be called multiple times\n");
+			printf("\n");
+
+			printf("See also:\n  %s\n", PACKAGE_URL);
+
+			exit(EXIT_SUCCESS);
+			break;
+		default:
+			break;
+		}
+	}
+	return 0;
+}
+
+int gen(int argc, char *argv[])
 {
 
 #define _GNU_SOURCE
@@ -68,7 +133,7 @@ int main(int argc, char *argv[])
 			printf("%s v%s\n\n", "conductor", VERSION);
 			printf("Usage:\n"
 			       "  %s [-h?] [-d domain] [-i ipaddress]  user|server|both  CN|address|email\n\n",
-			       "conductor"); // BINARY
+			       "conductor");
 
 			printf("Options:\n");
 			printf("  -?, -h, --help    show this help screen\n");
@@ -98,11 +163,10 @@ int main(int argc, char *argv[])
 	initialize_crypto();
 
 	conf  = malloc(sizeof(config_t));
-	char *home = getenv("HOME");
-	//char *etc  = "/etc/conductor.conf";
-	strcat(home, "/.cndtrc");
 	conductor_defaults(conf);
-	// if (parse_config_file(conf, etc) != 0)  printf("crud?\n");
+
+	char *home = getenv("HOME");
+	strcat(home, "/.cndtrc");
 	if (parse_config_file(conf, home) != 0) printf("crud?\n");
 
 	EVP_PKEY *in_key = NULL;
@@ -117,6 +181,7 @@ int main(int argc, char *argv[])
 	strcat(REQ_DN_IN, " Intermediate CA");
 	X509     *ca_crt = NULL;
 
+	printf("got here\n");
 	if (access("intermediate_cert.pem", F_OK) != -1) {
 		if (load_pair("intermediate_key.pem", &in_key, "intermediate_cert.pem", &in_crt)) {
 			fprintf(stderr, "Intermediate CA detected but unable to load pair.\n");
@@ -158,16 +223,19 @@ int main(int argc, char *argv[])
 	if (argv[optind] != NULL && argv[optind + 1] != NULL) {
 		CN = strdup(argv[optind + 1]);
 		if (strncmp("both", argv[optind], 4) == 0) {
+			printf("genning pair\n");
 			if (generate_pair(in_key, in_crt, &key, &crt, TYPE_client|TYPE_server, CN, ip_num, ips, domain_num, domains)) {
 				fprintf(stderr, "Failed to generate server key pair!\n");
 				return 1;
 			}
 		} else if (strncmp("user", argv[optind], 4) == 0) {
+			printf("genning pair\n");
 			if (generate_pair(in_key, in_crt, &key, &crt, TYPE_client, CN, ip_num, ips, domain_num, domains)) {
 				fprintf(stderr, "Failed to generate client key pair!\n");
 				return 1;
 			}
 		} else if (strncmp("server", argv[optind], 6) == 0) {
+			printf("genning pair\n");
 			if (generate_pair(in_key, in_crt, &key, &crt, TYPE_server, CN, ip_num, ips, domain_num, domains)) {
 				fprintf(stderr, "Failed to generate server key pair!\n");
 				return 1;
@@ -187,16 +255,22 @@ int main(int argc, char *argv[])
 	strcpy(fullchain, CN);
 	strcat(fullchain, ".fullchain.pem");
 
+	printf("saving certs\n");
 	save_cert(cert_path, &crt, NULL, NULL);
+	printf("saved cert\n");
 	save_cert(fullchain, &crt, &in_crt, &ca_crt);
+	printf("saved fullchain\n");
 	save_key(key_path, &key);
+	printf("saved key\n");
 
 	X509_free(in_crt);
 	X509_free(ca_crt);
 	EVP_PKEY_free(in_key);
+	printf("freed CAs");
 	X509_free(crt);
 	EVP_PKEY_free(key);
 
+	printf("freed memory");
 	cleanup_crypto();
 
 	return 0;
@@ -344,6 +418,7 @@ int generate_pair(EVP_PKEY *ca_key, X509 *ca_crt, EVP_PKEY **key, X509 **crt, in
 	NS_COMMENT = malloc(strlen(conf->org.o) + 20);
 	strcpy(NS_COMMENT, conf->org.o);
 	strcat(NS_COMMENT, " Certificate");
+	printf("comment added\n");
 
 	if (CERT_TYPE & TYPE_ca)
 		X509V3_set_ctx(&v3ctx, *crt, *crt, NULL, NULL, 0);
@@ -443,6 +518,7 @@ int generate_pair(EVP_PKEY *ca_key, X509 *ca_crt, EVP_PKEY **key, X509 **crt, in
 	if (CERT_TYPE & TYPE_ca) {
 		if (X509_sign(*crt, *key, EVP_sha384()) == 0) goto err;
 	} else {
+		printf("signing pem\n");
 		if (X509_sign(*crt, ca_key, EVP_sha384()) == 0) goto err;
 	}
 	X509_REQ_free(req);
@@ -486,8 +562,9 @@ int generate_key_csr(EVP_PKEY **key, X509_REQ **req, char *CN) /* {{{ */
 	addName("CN", CN);
 	#undef addName
 
+	printf("signing csr... ");
 	if (!X509_REQ_sign(*req, *key, EVP_sha384())) goto err;
-
+	printf("signed\n");
 	return 0;
 err:
 	BN_free(bne);
