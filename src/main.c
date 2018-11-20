@@ -181,7 +181,6 @@ int gen(int argc, char *argv[])
 	strcat(REQ_DN_IN, " Intermediate CA");
 	X509     *ca_crt = NULL;
 
-	printf("got here\n");
 	if (access("intermediate_cert.pem", F_OK) != -1) {
 		if (load_pair("intermediate_key.pem", &in_key, "intermediate_cert.pem", &in_crt)) {
 			fprintf(stderr, "Intermediate CA detected but unable to load pair.\n");
@@ -223,25 +222,22 @@ int gen(int argc, char *argv[])
 	if (argv[optind] != NULL && argv[optind + 1] != NULL) {
 		CN = strdup(argv[optind + 1]);
 		if (strncmp("both", argv[optind], 4) == 0) {
-			printf("genning pair\n");
 			if (generate_pair(in_key, in_crt, &key, &crt, TYPE_client|TYPE_server, CN, ip_num, ips, domain_num, domains)) {
 				fprintf(stderr, "Failed to generate server key pair!\n");
 				return 1;
 			}
 		} else if (strncmp("user", argv[optind], 4) == 0) {
-			printf("genning pair\n");
 			if (generate_pair(in_key, in_crt, &key, &crt, TYPE_client, CN, ip_num, ips, domain_num, domains)) {
 				fprintf(stderr, "Failed to generate client key pair!\n");
 				return 1;
 			}
 		} else if (strncmp("server", argv[optind], 6) == 0) {
-			printf("genning pair\n");
 			if (generate_pair(in_key, in_crt, &key, &crt, TYPE_server, CN, ip_num, ips, domain_num, domains)) {
 				fprintf(stderr, "Failed to generate server key pair!\n");
 				return 1;
 			}
 		} else {
-			printf("please provide a method [user,server,both] and a CN name (user@domain.tld, server.domain.tld)\n");
+			fprintf(stderr, "please provide a method [user,server,both] and a CN name (user@domain.tld, server.domain.tld)\n");
 			return 1;
 		}
 	}
@@ -255,22 +251,16 @@ int gen(int argc, char *argv[])
 	strcpy(fullchain, CN);
 	strcat(fullchain, ".fullchain.pem");
 
-	printf("saving certs\n");
 	save_cert(cert_path, &crt, NULL, NULL);
-	printf("saved cert\n");
 	save_cert(fullchain, &crt, &in_crt, &ca_crt);
-	printf("saved fullchain\n");
 	save_key(key_path, &key);
-	printf("saved key\n");
 
 	X509_free(in_crt);
 	X509_free(ca_crt);
 	EVP_PKEY_free(in_key);
-	printf("freed CAs");
 	X509_free(crt);
 	EVP_PKEY_free(key);
 
-	printf("freed memory");
 	cleanup_crypto();
 
 	return 0;
@@ -418,7 +408,6 @@ int generate_pair(EVP_PKEY *ca_key, X509 *ca_crt, EVP_PKEY **key, X509 **crt, in
 	NS_COMMENT = malloc(strlen(conf->org.o) + 20);
 	strcpy(NS_COMMENT, conf->org.o);
 	strcat(NS_COMMENT, " Certificate");
-	printf("comment added\n");
 
 	if (CERT_TYPE & TYPE_ca)
 		X509V3_set_ctx(&v3ctx, *crt, *crt, NULL, NULL, 0);
@@ -434,8 +423,12 @@ int generate_pair(EVP_PKEY *ca_key, X509 *ca_crt, EVP_PKEY **key, X509 **crt, in
 		} else {
 			if (add_ext(&v3ctx, *crt, NID_basic_constraints, "critical,CA:TRUE,pathlen:0")) goto err;
 		}
-		if (add_ext(&v3ctx, *crt,
-			NID_key_usage, "critical,Digital Signature,Certificate Sign,CRL Sign")) goto err;
+		if (CERT_TYPE & TYPE_intermediate)
+			if (add_ext(&v3ctx, *crt,
+				NID_key_usage, "critical,Digital Signature,Key Encipherment,Certificate Sign,CRL Sign")) goto err;
+		else
+			if (add_ext(&v3ctx, *crt,
+				NID_key_usage, "critical,Digital Signature,Certificate Sign,CRL Sign")) goto err;
 	} else if (CERT_TYPE & TYPE_client && CERT_TYPE & TYPE_server) {
 		if (add_ext(&v3ctx, *crt,
 			NID_basic_constraints, "CA:FALSE")) goto err;
@@ -518,7 +511,6 @@ int generate_pair(EVP_PKEY *ca_key, X509 *ca_crt, EVP_PKEY **key, X509 **crt, in
 	if (CERT_TYPE & TYPE_ca) {
 		if (X509_sign(*crt, *key, EVP_sha384()) == 0) goto err;
 	} else {
-		printf("signing pem\n");
 		if (X509_sign(*crt, ca_key, EVP_sha384()) == 0) goto err;
 	}
 	X509_REQ_free(req);
@@ -562,9 +554,8 @@ int generate_key_csr(EVP_PKEY **key, X509_REQ **req, char *CN) /* {{{ */
 	addName("CN", CN);
 	#undef addName
 
-	printf("signing csr... ");
 	if (!X509_REQ_sign(*req, *key, EVP_sha384())) goto err;
-	printf("signed\n");
+
 	return 0;
 err:
 	BN_free(bne);
