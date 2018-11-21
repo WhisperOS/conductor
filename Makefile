@@ -66,4 +66,4 @@ install: conductor doc
 clean:
 	rm -f $(BINS) src/conductor.h src/*.o src/parse.[ch] src/scanner.c
 	rm -f *.pem man/conductor.1 man/conductor-schema.ldif
-	rm -rf man/ldif
+	rm -rf man/ldif man/schema-convert.conf
