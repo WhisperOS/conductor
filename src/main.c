@@ -49,7 +49,7 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "please provide a command\n");
 		fprintf(stderr, "available commands are:\n");
 		fprintf(stderr, "  init/new\n");
-		frpintf(stderr, "  gen\n");
+		fprintf(stderr, "  gen\n");
 		return 1;
 	}
 	if (strcmp(argv[1], "init") == 0 || strcmp(argv[1], "new") == 0) {
@@ -60,7 +60,7 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "command %s, is not a valid command\n", argv[1]);
 		fprintf(stderr, "valid commands are:\n");
 		fprintf(stderr, "  init/new\n");
-		frpintf(stderr, "  gen\n");
+		fprintf(stderr, "  gen\n");
 		return 1;
 	}
 
@@ -72,8 +72,6 @@ int new(int argc, char *argv[])
 	struct option long_opts[] = {
 		{ "file",   required_argument, NULL, 'f' },
 		{ "help",   no_argument,       NULL, 'h' },
-		{ "ip",     required_argument, NULL, 'i' },
-		{ "domain", required_argument, NULL, 'd' },
 		{ 0, 0, 0, 0 },
 	};
 	for (;;) {
@@ -115,10 +113,15 @@ int gen(int argc, char *argv[])
 
 #define _GNU_SOURCE
 	struct option long_opts[] = {
-		{ "file",   required_argument, NULL, 'f' },
-		{ "help",   no_argument,       NULL, 'h' },
-		{ "ip",     required_argument, NULL, 'i' },
-		{ "domain", required_argument, NULL, 'd' },
+		{ "file",     required_argument, NULL, 'f' },
+		{ "help",     no_argument,       NULL, 'h' },
+		{ "ip",       required_argument, NULL, 'i' },
+		{ "domain",   required_argument, NULL, 'd' },
+		{ "org",      required_argument, NULL, 'o' },
+		{ "orgunit",  required_argument, NULL, 'u' },
+		{ "locality", required_argument, NULL, 'l' },
+		{ "state",    required_argument, NULL, 's' },
+		{ "country",  required_argument, NULL, 'c' },
 		{ 0, 0, 0, 0 },
 	};
 	char  **ips;
@@ -127,9 +130,14 @@ int gen(int argc, char *argv[])
 	int    domain_num = 0;
 	ips     = malloc(sizeof(char *) * 20);
 	domains = malloc(sizeof(char *) * 20);
+	char  *o  = NULL;
+	char  *ou = NULL;
+	char  *l  = NULL;
+	char  *st = NULL;
+	char  *country = NULL;
 	for (;;) {
 		int idx = 1;
-		int c = getopt_long(argc, argv, "f:h?i:+d:+", long_opts, &idx);
+		int c = getopt_long(argc, argv, "f:h?i:+d:+o:u:l:s:c:", long_opts, &idx);
 		if (c == -1) break;
 
 		switch (c) {
@@ -144,10 +152,20 @@ int gen(int argc, char *argv[])
 
 			printf("Options:\n");
 			printf("  -?, -h, --help    show this help screen\n");
+			printf("  -o, --org         <STRING>\n"
+				   "                      The Org (O) of the cert (Optional)\n");
+			printf("  -u, --orgunit     <STRING>\n"
+				   "                      The Org Unit (OU) of the cert (Optional)\n");
+			printf("  -l, --locality    <STRING>\n"
+				   "                      The locality/city (L) of the cert (Optional)\n");
+			printf("  -s, --state       <STRING>\n"
+				   "                      The state (ST) of the cert (Optional)\n");
+			printf("  -c, --country     <STRING>\n"
+				   "                      The country (C) of the cert (Optional)\n");
 			printf("  -i, --ip          <IP ADDRESS>\n"
-				   "                      Add a SAN IP, optional, and can be called multiple times\n");
+				   "                      Add a SAN IP, optional, and can be called multiple times (Optional)\n");
 			printf("  -d, --domain      <DOMAIN NAME>\n"
-				   "                      Add a SAN domain, optional, and can be called multiple times\n");
+				   "                      Add a SAN domain, optional, and can be called multiple times (Optional)\n");
 			printf("\n");
 
 			printf("See also:\n  %s\n", PACKAGE_URL);
@@ -162,6 +180,21 @@ int gen(int argc, char *argv[])
 			ips[ip_num] = strdup(optarg);
 			ip_num++;
 			break;
+		case 'o':
+			o = strdup(optarg);
+			break;
+		case 'u':
+			ou = strdup(optarg);
+			break;
+		case 'l':
+			l = strdup(optarg);
+			break;
+		case 's':
+			st = strdup(optarg);
+			break;
+		case 'c':
+			country = strdup(optarg);
+			break;
 		default:
 			break;
 		}
@@ -175,6 +208,17 @@ int gen(int argc, char *argv[])
 	char *home = getenv("HOME");
 	strcat(home, "/.cndtrc");
 	if (parse_config_file(conf, home) != 0) printf("crud?\n");
+
+	if (o != NULL)
+		conf->org.o = o;
+	if (ou != NULL)
+		conf->org.ou = ou;
+	if (l != NULL)
+		conf->org.l = l;
+	if (st != NULL)
+		conf->org.st = st;
+	if (country != NULL)
+		conf->org.c = country;
 
 	EVP_PKEY *in_key = NULL;
 	X509     *in_crt = NULL;
@@ -430,12 +474,13 @@ int generate_pair(EVP_PKEY *ca_key, X509 *ca_crt, EVP_PKEY **key, X509 **crt, in
 		} else {
 			if (add_ext(&v3ctx, *crt, NID_basic_constraints, "critical,CA:TRUE,pathlen:0")) goto err;
 		}
-		if (CERT_TYPE & TYPE_intermediate)
+		if (CERT_TYPE & TYPE_intermediate) {
 			if (add_ext(&v3ctx, *crt,
 				NID_key_usage, "critical,Digital Signature,Key Encipherment,Certificate Sign,CRL Sign")) goto err;
-		else
+		} else {
 			if (add_ext(&v3ctx, *crt,
 				NID_key_usage, "critical,Digital Signature,Certificate Sign,CRL Sign")) goto err;
+		}
 	} else if (CERT_TYPE & TYPE_client && CERT_TYPE & TYPE_server) {
 		if (add_ext(&v3ctx, *crt,
 			NID_basic_constraints, "CA:FALSE")) goto err;
