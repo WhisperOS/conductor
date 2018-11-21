@@ -15,6 +15,7 @@
 #include <openssl/x509v3.h>
 
 #include "conductor.h"
+#include "log.h"
 #include "config_file.h"
 
 
@@ -45,7 +46,10 @@ int main(int argc, char *argv[])
 {
 
 	if (argv[1] == NULL) {
-		printf("please provide a cmd\n");
+		fprintf(stderr, "please provide a command\n");
+		fprintf(stderr, "available commands are:\n");
+		fprintf(stderr, "  init/new\n");
+		frpintf(stderr, "  gen\n");
 		return 1;
 	}
 	if (strcmp(argv[1], "init") == 0 || strcmp(argv[1], "new") == 0) {
@@ -53,7 +57,10 @@ int main(int argc, char *argv[])
 	} else if (strcmp(argv[1], "gen") == 0) {
 		return gen(--argc, ++argv);
 	} else {
-		printf("cmd %s, is not a valid command\n", argv[1]);
+		fprintf(stderr, "command %s, is not a valid command\n", argv[1]);
+		fprintf(stderr, "valid commands are:\n");
+		fprintf(stderr, "  init/new\n");
+		frpintf(stderr, "  gen\n");
 		return 1;
 	}
 

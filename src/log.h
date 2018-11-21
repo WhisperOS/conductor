@@ -1,5 +1,5 @@
-#ifndef _TLS_SERVER_LOG_H
-#define _TLS_SERVER_LOG_H
+#ifndef _CONDUCTOR_LOG_H
+#define _CONDUCTOR_LOG_H
 
 #include <syslog.h>
 
