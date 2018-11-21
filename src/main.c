@@ -209,16 +209,31 @@ int gen(int argc, char *argv[])
 	strcat(home, "/.cndtrc");
 	if (parse_config_file(conf, home) != 0) printf("crud?\n");
 
-	if (o != NULL)
-		conf->org.o = o;
-	if (ou != NULL)
-		conf->org.ou = ou;
-	if (l != NULL)
-		conf->org.l = l;
-	if (st != NULL)
-		conf->org.st = st;
-	if (country != NULL)
-		conf->org.c = country;
+	if (o != NULL) {
+		if (conf->org.o != NULL)
+			free(conf->org.o);
+		conf->org.o = strdup(o);
+	}
+	if (ou != NULL) {
+		if (conf->org.ou != NULL)
+			free(conf->org.ou);
+		conf->org.ou = strdup(ou);
+	}
+	if (l != NULL) {
+		if (conf->org.l != NULL)
+			free(conf->org.l);
+		conf->org.l = strdup(l);
+	}
+	if (st != NULL) {
+		if (conf->org.st != NULL)
+			free(conf->org.st);
+		conf->org.st = strdup(st);
+	}
+	if (country != NULL) {
+		if (conf->org.c != NULL)
+			free(conf->org.c);
+		conf->org.c = strdup(country);
+	}
 
 	EVP_PKEY *in_key = NULL;
 	X509     *in_crt = NULL;
@@ -363,7 +378,7 @@ int save_key(const char *key_path, EVP_PKEY **key) /* {{{ */
 	if (!PEM_write_bio_PrivateKey(bio, *key, NULL, NULL, 0, NULL, NULL)) goto err;
 	BIO_free_all(bio);
 	chmod(key_path, S_IRUSR|S_IWUSR);
-	BIO_free_all(bio);
+
 	return 0;
 err:
 	return 1;
