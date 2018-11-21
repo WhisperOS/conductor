@@ -135,6 +135,7 @@ int gen(int argc, char *argv[])
 	char  *l  = NULL;
 	char  *st = NULL;
 	char  *country = NULL;
+	char  *file = NULL;
 	for (;;) {
 		int idx = 1;
 		int c = getopt_long(argc, argv, "f:h?i:+d:+o:u:l:s:c:", long_opts, &idx);
@@ -142,7 +143,8 @@ int gen(int argc, char *argv[])
 
 		switch (c) {
 		case 'f':
-			// do nothing
+			file = strdup(optarg);
+			break;
 		case 'h':
 		case '?':
 			printf("%s v%s\n\n", "conductor", VERSION);
@@ -205,9 +207,31 @@ int gen(int argc, char *argv[])
 	conf  = malloc(sizeof(config_t));
 	conductor_defaults(conf);
 
+	if (access("/etc/conductor.conf", F_OK) != -1) {
+		if (parse_config_file(conf, "/etc/conductor.conf") != 0) {
+			fprintf(stderr, "failed to parse %s\n", "/etc/conductor.conf");
+			return 1;
+		}
+	}
 	char *home = getenv("HOME");
 	strcat(home, "/.cndtrc");
-	if (parse_config_file(conf, home) != 0) printf("crud?\n");
+	if (access(home, F_OK) != -1) {
+		if (parse_config_file(conf, home) != 0) {
+			fprintf(stderr, "failed to parse %s\n", home);
+			return 1;
+		}
+	}
+	if (file != NULL) {
+		if (access(file, F_OK) != -1) {
+			if (parse_config_file(conf, home) != 0) {
+				fprintf(stderr, "failed to parse %s\n", file);
+				return 1;
+			}
+		} else {
+			fprintf(stderr, "configuration file [%s] specified but unable to access\n", file);
+			return 1;
+		}
+	}
 
 	if (o != NULL) {
 		if (conf->org.o != NULL)

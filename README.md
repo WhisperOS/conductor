@@ -6,14 +6,14 @@ TLS applications written in C, and for fun!
 
 ## How to
 
-    conductor server server.domain.tld -i 192.168.1.1 -d service.domain.tld
+    conductor gen server server.domain.tld -i 192.168.1.1 -d service.domain.tld
 
 In a empty directory this will generate you a Certificate Authority Cert/Key,
 an Intermediate Certificate Authority Cert/Key, and a server x.509 cert/key and fullchain.
 
 Next generate a user cert.
 
-    conductor user dan
+    conductor gen user dan
 
 It's that easy!
 

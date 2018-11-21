@@ -45,13 +45,6 @@ Add a SAN domain name.
 
 =back
 
-=head1 Conf File Example
-
-    C  = US
-    ST = NY
-    L  = Buffalo
-    OU = IT
-    O  = Defiance Technologies Inc.
 
 =head1 SEE ALSO
 
