@@ -66,13 +66,13 @@ static int dummy_interact(LDAP *ld, unsigned flags, void *defaults, void *sasl_i
 	return LDAP_SUCCESS;
 }
 
-int auth(config_t *conf)
+LDAP* auth(config_t *conf)
 {
 	LDAP *ld;
 	int rc, protocol = LDAP_VERSION3;
 	if ((rc = ldap_initialize(&ld, conf->ldap.uri)) != LDAP_SUCCESS) {
 		fprintf(stderr, "ldap init failure (%d) [%s]\n", rc, ldap_err2string(rc));
-		return 1;
+		return NULL;
 	}
 	ldap_set_option(ld, LDAP_OPT_REFERRALS, LDAP_OPT_OFF);
 	ldap_set_option(ld, LDAP_OPT_PROTOCOL_VERSION, &protocol);
@@ -142,7 +142,7 @@ int auth(config_t *conf)
 	}
 
 done:
-	return rc;
+	return ld;
 }
 
 void print_attr(LDAP *ld, char *dn, char *att)
@@ -179,40 +179,47 @@ void print_attr(LDAP *ld, char *dn, char *att)
 	ldap_memfree(attr_name);
 }
 
-void metadata(LDAP *ld, config_t *conf)
+int fetch_config(LDAP *ld, config_t *conf)
 {
 	LDAPMessage *result = NULL, *e;
 	int rc;
-	char *dn = "cn=conductor,";
+	char *dn = malloc(strlen("cn=conductor,") + strlen(conf->ldap.dn));
+	strcpy(dn, "cn=conductor,");
 	strcat(dn, conf->ldap.dn);
 	char *attrs[] = { "ou", "cn", "o", "st", "l", "c", "conductorIntermediateCert", "conductorIntermediateKey",  NULL};
 	if ((rc = ldap_search_ext_s(ld, dn, LDAP_SCOPE_SUBTREE, NULL, attrs, 0, NULL, NULL, LDAP_NO_LIMIT,
 		LDAP_NO_LIMIT, &result)) != LDAP_SUCCESS) {
 		printf("ldap search failure (%d) [%s]\n", rc, ldap_err2string(rc));
-		exit(1);
+		return 1;
 	}
 	if ((e = ldap_first_entry(ld, result)) == NULL) {
 		printf("no results\n");
-		exit(0);
+		return 1;
 	}
 	char *attr_name;
 	BerElement *ber;
 	struct berval **vals;
 	for (attr_name = ldap_first_attribute(ld, e, &ber); attr_name != NULL;
 			attr_name = ldap_next_attribute(ld, e, ber)) {
-		printf("%s: ", attr_name);
+		printf("%s:\n", attr_name);
+		int i = 0;
+		char *attr;
+		while ((attr = attrs[++i]) != NULL)
+			if (strcmp(attr_name, attr) == 0)
+				break;
 		if ((vals = ldap_get_values_len(ld, e, attr_name)) != NULL) {
 			for (int i = 0; vals[i] != NULL; i++) {
 				if (i == 0)
 					printf("%s", vals[i]->bv_val);
 				else
-					printf(", %s", vals[i]->bv_val);
+					printf("\n%s", vals[i]->bv_val);
 			}
 			ldap_value_free_len(vals);
 		}
 		printf("\n");
 	}
 	ldap_memfree(attr_name);
+	return 0;
 }
 
 static void _mod_add_strings(LDAPMod *mod, char *type, char **vals)

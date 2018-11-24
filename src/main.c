@@ -14,6 +14,8 @@
 #include <openssl/rand.h>
 #include <openssl/x509v3.h>
 
+#include <ldap.h>
+
 #include "conductor.h"
 #include "log.h"
 #include "config_file.h"
@@ -70,41 +72,145 @@ int main(int argc, char *argv[])
 int new(int argc, char *argv[])
 {
 	struct option long_opts[] = {
-		{ "file",   required_argument, NULL, 'f' },
-		{ "help",   no_argument,       NULL, 'h' },
+		{ "file",      required_argument, NULL, 'f' },
+		{ "help",      no_argument,       NULL, 'h' },
+		{ "binddn",    required_argument, NULL, 'b' },
+		{ "dn",        required_argument, NULL, 'd' },
+		{ "passwd",    required_argument, NULL, 'p' },
+		{ "uri",       required_argument, NULL, 'H' },
+		{ "keytab",    required_argument, NULL, 'k' },
+		{ "principal", required_argument, NULL, 'P' },
 		{ 0, 0, 0, 0 },
 	};
+	char *file      = NULL;
+	char *binddn    = NULL;
+	char *dn        = NULL;
+	char *passwd    = NULL;
+	char *uri       = NULL;
+	char *keytab    = NULL;
+	char *principal = NULL;
 	for (;;) {
 		int idx = 1;
-		int c = getopt_long(argc, argv, "f:h?i:+d:+", long_opts, &idx);
+		int c = getopt_long(argc, argv, "f:h?b:d:p:H:k:p:", long_opts, &idx);
 		if (c == -1) break;
 
 		switch (c) {
 		case 'f':
-			// do nothing
+			file = strdup(optarg);
+			break;
 		case 'h':
 		case '?':
-			printf("%s v%s\n\n", "conductor", VERSION);
+			printf("%s v%s\n\n", "conductor-init", VERSION);
 			printf("Usage:\n"
-			       "  %s [-h?] [-d domain] [-i ipaddress]  user|server|both  CN|address|email\n\n",
+			       "  %s init [-h?] \n\n",
 			       "conductor");
 
 			printf("Options:\n");
 			printf("  -?, -h, --help    show this help screen\n");
-			printf("  -i, --ip          <IP ADDRESS>\n"
-				   "                      Add a SAN IP, optional, and can be called multiple times\n");
-			printf("  -d, --domain      <DOMAIN NAME>\n"
-				   "                      Add a SAN domain, optional, and can be called multiple times\n");
 			printf("\n");
 
 			printf("See also:\n  %s\n", PACKAGE_URL);
 
 			exit(EXIT_SUCCESS);
 			break;
+		case 'b':
+			binddn = strdup(optarg);
+			break;
+		case 'd':
+			dn = strdup(optarg);
+			break;
+		case 'p':
+			passwd = strdup(optarg);
+			break;
+		case 'H':
+			uri = strdup(optarg);
+			break;
+		case 'k':
+			keytab = strdup(optarg);
+			break;
+		case 'P':
+			principal = strdup(optarg);
+			break;
 		default:
 			break;
 		}
 	}
+
+	conf  = malloc(sizeof(config_t));
+	conductor_defaults(conf);
+
+	if (access("/etc/conductor.conf", F_OK) != -1) {
+		if (parse_config_file(conf, "/etc/conductor.conf") != 0) {
+			fprintf(stderr, "failed to parse %s\n", "/etc/conductor.conf");
+			return 1;
+		}
+	}
+	char *home = getenv("HOME");
+	strcat(home, "/.cndtrc");
+	if (access(home, F_OK) != -1) {
+		if (parse_config_file(conf, home) != 0) {
+			fprintf(stderr, "failed to parse %s\n", home);
+			return 1;
+		}
+	}
+
+	if (file != NULL) {
+		if (access(file, F_OK) != -1) {
+			if (parse_config_file(conf, home) != 0) {
+				fprintf(stderr, "failed to parse %s\n", file);
+				return 1;
+			}
+		} else {
+			fprintf(stderr, "configuration file [%s] specified but unable to access\n", file);
+			return 1;
+		}
+	}
+
+	if (binddn != NULL) {
+		if (conf->ldap.bind != NULL)
+			free(conf->ldap.bind);
+		conf->ldap.bind = strdup(binddn);
+	}
+	if (uri != NULL) {
+		if (conf->ldap.uri != NULL)
+			free(conf->ldap.uri);
+		conf->ldap.uri = strdup(uri);
+	}
+	if (dn != NULL) {
+		if (conf->ldap.dn != NULL)
+			free(conf->ldap.dn);
+		conf->ldap.dn = strdup(dn);
+	}
+	if (passwd != NULL) {
+		if (conf->ldap.pw != NULL)
+			free(conf->ldap.pw);
+		conf->ldap.pw = strdup(passwd);
+	}
+	if (keytab != NULL) {
+		if (conf->krb5.keytab != NULL)
+			free(conf->krb5.keytab);
+		conf->krb5.keytab = strdup(keytab);
+	}
+	if (principal != NULL) {
+		if (conf->krb5.principal != NULL)
+			free(conf->krb5.principal);
+		conf->krb5.principal = strdup(principal);
+	}
+
+	printf("using keytab: %s\n", conf->krb5.keytab);
+	LDAP *ld = auth(conf);
+	printf("authed!\n");
+	fetch_config(ld, conf);
+
+	// initialize(ld, conf, ca, in);
+
+	/*
+	if
+		initialize
+	else
+		all good
+	close
+	*/
 	return 0;
 }
 
@@ -130,12 +236,14 @@ int gen(int argc, char *argv[])
 	int    domain_num = 0;
 	ips     = malloc(sizeof(char *) * 20);
 	domains = malloc(sizeof(char *) * 20);
-	char  *o  = NULL;
-	char  *ou = NULL;
-	char  *l  = NULL;
-	char  *st = NULL;
+
+	char  *o       = NULL;
+	char  *ou      = NULL;
+	char  *l       = NULL;
+	char  *st      = NULL;
 	char  *country = NULL;
-	char  *file = NULL;
+	char  *file    = NULL;
+
 	for (;;) {
 		int idx = 1;
 		int c = getopt_long(argc, argv, "f:h?i:+d:+o:u:l:s:c:", long_opts, &idx);
@@ -147,9 +255,9 @@ int gen(int argc, char *argv[])
 			break;
 		case 'h':
 		case '?':
-			printf("%s v%s\n\n", "conductor", VERSION);
+			printf("%s v%s\n\n", "conductor-gen", VERSION);
 			printf("Usage:\n"
-			       "  %s [-h?] [-d domain] [-i ipaddress]  user|server|both  CN|address|email\n\n",
+			       "  %s gen [-h?] [-d domain] [-i ipaddress]  user|server|both  CN|address|email\n\n",
 			       "conductor");
 
 			printf("Options:\n");
@@ -165,9 +273,9 @@ int gen(int argc, char *argv[])
 			printf("  -c, --country     <STRING>\n"
 				   "                      The country (C) of the cert (Optional)\n");
 			printf("  -i, --ip          <IP ADDRESS>\n"
-				   "                      Add a SAN IP, optional, and can be called multiple times (Optional)\n");
+				   "                      Add a SAN IP, can be called multiple times (Optional)\n");
 			printf("  -d, --domain      <DOMAIN NAME>\n"
-				   "                      Add a SAN domain, optional, and can be called multiple times (Optional)\n");
+				   "                      Add a SAN domain, can be called multiple times (Optional)\n");
 			printf("\n");
 
 			printf("See also:\n  %s\n", PACKAGE_URL);

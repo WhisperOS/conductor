@@ -1,6 +1,7 @@
 #
 # OpenLDAP schema file for Conductor
-#  Requires Core Schema ( Should be included by default )
+#  Requires Core Schema ( Should be included by default
+#  installations )
 
 attributetype ( 1.3.5.1.4.1.52904.3.1.1
 	NAME 'conductorCaCert'
