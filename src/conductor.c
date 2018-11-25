@@ -15,6 +15,7 @@
 #include <openssl/x509v3.h>
 
 #include "conductor.h"
+#include "utils.h"
 
 #define CC_NAME "MEMORY:krb5-conductor"
 #define UNUSED(x) ((x)=(x))
@@ -179,7 +180,7 @@ void print_attr(LDAP *ld, char *dn, char *att)
 	ldap_memfree(attr_name);
 }
 
-int fetch_config(LDAP *ld, config_t *conf)
+int fetch_config(LDAP *ld, config_t *conf, ccert_t *in)
 {
 	LDAPMessage *result = NULL, *e;
 	int rc;
@@ -201,22 +202,63 @@ int fetch_config(LDAP *ld, config_t *conf)
 	struct berval **vals;
 	for (attr_name = ldap_first_attribute(ld, e, &ber); attr_name != NULL;
 			attr_name = ldap_next_attribute(ld, e, ber)) {
-		printf("%s:\n", attr_name);
-		int i = 0;
-		char *attr;
-		while ((attr = attrs[++i]) != NULL)
-			if (strcmp(attr_name, attr) == 0)
-				break;
 		if ((vals = ldap_get_values_len(ld, e, attr_name)) != NULL) {
 			for (int i = 0; vals[i] != NULL; i++) {
-				if (i == 0)
-					printf("%s", vals[i]->bv_val);
-				else
-					printf("\n%s", vals[i]->bv_val);
+				if (strcmp(attr_name, "cn") == 0) {
+					
+				}
+				if (strcmp(attr_name, "o")  == 0) {
+					if (conf->org.o != NULL)
+						free(conf->org.o);
+					conf->org.o = strdup((char *)vals[i]->bv_val);
+				}
+				if (strcmp(attr_name, "ou") == 0) {
+					if (conf->org.ou != NULL)
+						free(conf->org.ou);
+					conf->org.ou = strdup((char *)vals[i]->bv_val);
+				}
+				if (strcmp(attr_name, "l")  == 0) {
+					if (conf->org.l != NULL)
+						free(conf->org.l);
+					conf->org.l = strdup((char *)vals[i]->bv_val);
+				}
+				if (strcmp(attr_name, "st") == 0) {
+					if (conf->org.st != NULL)
+						free(conf->org.st);
+					conf->org.st = strdup((char *)vals[i]->bv_val);
+				}
+				if (strcmp(attr_name, "c")  == 0) {
+					if (conf->org.c != NULL)
+						free(conf->org.c);
+					conf->org.c = strdup((char *)vals[i]->bv_val);
+				}
+				if (strcmp(attr_name, "conductorIntermediateCert") == 0) {
+					if (in->crt != NULL)
+						free(in->crt);
+					BIO *bio = NULL;
+					BUF_MEM *bptr = malloc(sizeof(BUF_MEM));
+					bptr->length = vals[i]->bv_len;
+					bptr->data   = vals[i]->bv_val;
+					BIO_set_mem_buf(bio, bptr, BIO_NOCLOSE);
+					in->crt = PEM_read_bio_X509(bio, NULL, NULL, NULL);
+					if (in->crt == NULL)
+						return 1;
+				}
+				if (strcmp(attr_name, "conductorIntermediateKey")  == 0) {
+					if (in->key != NULL)
+						free(in->key);
+					BIO *bio = NULL;
+					BUF_MEM *bptr = malloc(sizeof(BUF_MEM));
+					bptr->length = vals[i]->bv_len;
+					bptr->data   = vals[i]->bv_val;
+					BIO_set_mem_buf(bio, bptr, BIO_NOCLOSE);
+					in->key = PEM_read_bio_PrivateKey(bio, NULL, NULL, NULL);
+					if (in->key == NULL)
+						return 1;
+				}
 			}
 			ldap_value_free_len(vals);
 		}
-		printf("\n");
 	}
 	ldap_memfree(attr_name);
 	return 0;
@@ -273,7 +315,8 @@ int upload_cert(LDAP *ld, ccert_t *cert)
 {
 	int rc;
 	LDAPMod **mods;
-	mods = malloc(sizeof(LDAPMod *) * 5);
+	if ((mods = malloc(sizeof(LDAPMod *) * 5)) == NULL)
+		return 1;
 
 	char *cn[] = { cert->cn, NULL };
 	_mod_add_strings(mods[0], "cn", cn);
@@ -281,8 +324,10 @@ int upload_cert(LDAP *ld, ccert_t *cert)
 	char *val[] = { "conductor", "top", NULL };
 	_mod_add_strings(mods[1], "objectClass", val);
 
-	_mod_add_cert(mods[2], "conductorCert", cert->crt);
-	_mod_add_key(mods[3], "conductorKey", cert->key);
+	if (_mod_add_cert(mods[2], "conductorCert", cert->crt) != 0)
+		return 1;
+	if (_mod_add_key(mods[3], "conductorKey", cert->key) != 0)
+		return 1;
 
 	mods[4] = (LDAPMod *) NULL;
 

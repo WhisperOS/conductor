@@ -80,6 +80,11 @@ int new(int argc, char *argv[])
 		{ "uri",       required_argument, NULL, 'H' },
 		{ "keytab",    required_argument, NULL, 'k' },
 		{ "principal", required_argument, NULL, 'P' },
+		{ "org",       required_argument, NULL, 'o' },
+		{ "orgunit",   required_argument, NULL, 'u' },
+		{ "locality",  required_argument, NULL, 'l' },
+		{ "state",     required_argument, NULL, 's' },
+		{ "country",   required_argument, NULL, 'c' },
 		{ 0, 0, 0, 0 },
 	};
 	char *file      = NULL;
@@ -89,9 +94,15 @@ int new(int argc, char *argv[])
 	char *uri       = NULL;
 	char *keytab    = NULL;
 	char *principal = NULL;
+	
+	char  *o        = NULL;
+	char  *ou       = NULL;
+	char  *l        = NULL;
+	char  *st       = NULL;
+	char  *country  = NULL;
 	for (;;) {
 		int idx = 1;
-		int c = getopt_long(argc, argv, "f:h?b:d:p:H:k:p:", long_opts, &idx);
+		int c = getopt_long(argc, argv, "f:h?b:d:p:H:k:P:o:u:l:s:c:", long_opts, &idx);
 		if (c == -1) break;
 
 		switch (c) {
@@ -131,6 +142,21 @@ int new(int argc, char *argv[])
 		case 'P':
 			principal = strdup(optarg);
 			break;
+		case 'o':
+			o = strdup(optarg);
+			break;
+		case 'u':
+			ou = strdup(optarg);
+			break;
+		case 'l':
+			l = strdup(optarg);
+			break;
+		case 's':
+			st = strdup(optarg);
+			break;
+		case 'c':
+			country = strdup(optarg);
+			break;
 		default:
 			break;
 		}
@@ -166,6 +192,32 @@ int new(int argc, char *argv[])
 		}
 	}
 
+	if (o != NULL) {
+		if (conf->org.o != NULL)
+			free(conf->org.o);
+		conf->org.o = strdup(o);
+	}
+	if (ou != NULL) {
+		if (conf->org.ou != NULL)
+			free(conf->org.ou);
+		conf->org.ou = strdup(ou);
+	}
+	if (l != NULL) {
+		if (conf->org.l != NULL)
+			free(conf->org.l);
+		conf->org.l = strdup(l);
+	}
+	if (st != NULL) {
+		if (conf->org.st != NULL)
+			free(conf->org.st);
+		conf->org.st = strdup(st);
+	}
+	if (country != NULL) {
+		if (conf->org.c != NULL)
+			free(conf->org.c);
+		conf->org.c = strdup(country);
+	}
+
 	if (binddn != NULL) {
 		if (conf->ldap.bind != NULL)
 			free(conf->ldap.bind);
@@ -186,6 +238,7 @@ int new(int argc, char *argv[])
 			free(conf->ldap.pw);
 		conf->ldap.pw = strdup(passwd);
 	}
+
 	if (keytab != NULL) {
 		if (conf->krb5.keytab != NULL)
 			free(conf->krb5.keytab);
@@ -197,10 +250,10 @@ int new(int argc, char *argv[])
 		conf->krb5.principal = strdup(principal);
 	}
 
-	printf("using keytab: %s\n", conf->krb5.keytab);
 	LDAP *ld = auth(conf);
-	printf("authed!\n");
-	fetch_config(ld, conf);
+
+	ccert_t *in = malloc(sizeof(ccert_t));
+	fetch_config(ld, conf, in);
 
 	// initialize(ld, conf, ca, in);
 
