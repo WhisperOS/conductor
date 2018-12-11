@@ -1,7 +1,12 @@
 CXXFLAGS =-std=c99 -pipe -g -Wall -Wextra -pedantic
 CFLAGS  ?=
 LDFLAGS  =
-LIBS     = -lcrypto -lkrb5 -lcom_err -lldap -lgssapi_krb5 -lsasl2
+LIBS     = -lcrypto
+WITH_LDAP ?=
+ifdef WITH_LDAP
+	LIBS += -lkrb5 -lcom_err -lldap -lgssapi_krb5 -lsasl2
+endif
+
 PREFIX  ?= /usr/local
 DESTDIR ?=
 
@@ -17,8 +22,8 @@ conductor_OBJS := src/conductor.h $(OBJS) src/parse.o src/scanner.o src/conducto
 all: $(BINS)
 
 define BIN_template =
- $(1): $$($(1)_OBJS) $$($(1)_LIBS:%=-l%)
- ALL_OBJS   += $$($(1)_OBJS)
+  $(1): $$($(1)_OBJS) $$($(1)_LIBS:%=-l%)
+  ALL_OBJS   += $$($(1)_OBJS)
 endef
 
 $(foreach bin,$(BINS),$(eval $(call BIN_template,$(bin))))
@@ -34,8 +39,13 @@ src/%.o: src/%.c
 	$(CC) -c -o $@ $(CFLAGS) $(CXXFLAGS) $<
 
 src/%.h: src/%.h.in
-	sed -e 's/@VERSION@/$(VERSION)/g' \
-		-e 's$$@PACKAGE_URL@$$$(PACKAGE_URL)$$g' $< > $@
+	sed  -e 's/@VERSION@/$(VERSION)/g' \
+		 -e 's$$@PACKAGE_URL@$$$(PACKAGE_URL)$$g' $< > $@
+ifdef WITH_LDAP
+	sed  -e 's/@WITH_LDAP@/1/g'  $< > $@
+else
+	sed  -e '/@WITH_LDAP@/g'  $< > $@
+endif
 
 schema:
 	rm -rf man/ldif

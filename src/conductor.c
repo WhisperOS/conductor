@@ -1,12 +1,9 @@
 #define _POSIX_C_SOURCE  200112L
 #include <stdlib.h>
 #include <stdio.h>
-#include <ldap.h>
 #include <strings.h>
 #include <stdlib.h>
 #include <sys/stat.h>
-#include <sasl/sasl.h>
-#include <krb5.h>
 
 #include <openssl/err.h>
 #include <openssl/conf.h>
@@ -16,6 +13,12 @@
 
 #include "conductor.h"
 #include "utils.h"
+
+#ifdef WITH_LDAP
+#include <sasl/sasl.h>
+#include <ldap.h>
+#include <krb5.h>
+#endif
 
 #define CC_NAME "MEMORY:krb5-conductor"
 #define UNUSED(x) ((x)=(x))
@@ -30,6 +33,7 @@ void conductor_defaults(config_t *conf)
 	conf->org.st = "NY";
 }
 
+#ifdef WITH_LDAP
 struct external_defaults {
 	char *bind;
 	char *pw;
@@ -375,3 +379,4 @@ int initialize(LDAP *ld, config_t *conf, ccert_t *ca, ccert_t *in)
 
 	return rc;
 }
+#endif

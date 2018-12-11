@@ -250,11 +250,12 @@ int new(int argc, char *argv[])
 		conf->krb5.principal = strdup(principal);
 	}
 
+#ifdef WITH_LDAP
 	LDAP *ld = auth(conf);
 
 	ccert_t *in = malloc(sizeof(ccert_t));
 	fetch_config(ld, conf, in);
-
+#endif
 	// initialize(ld, conf, ca, in);
 
 	/*
